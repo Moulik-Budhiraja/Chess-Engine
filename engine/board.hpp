@@ -302,13 +302,13 @@ class Board {
             case Piece::QUEEN:
                 moves.append(generateSlidingMoves(startSquare, piece, checkLines, pinLines));
                 break;
-                // case Piece::PAWN:
-                //     moves.append(generatePawnMoves(startSquare, piece));
-                //     break;
+            case Piece::PAWN:
+                moves.append(generatePawnMoves(startSquare, piece, checkLines, pinLines));
+                break;
 
-                // case Piece::KNIGHT:
-                //     moves.append(generateLegalKnightMoves(startSquare, piece));
-                //     break;
+            case Piece::KNIGHT:
+                moves.append(generateKnightMoves(startSquare, piece, checkLines, pinLines));
+                break;
 
                 // case Piece::KING:
                 //     moves.append(generateKingMoves(startSquare, piece));
@@ -416,21 +416,30 @@ class Board {
         return moves;
     }
 
-    stackvector<Move, MAX_PIECE_MOVES> generateLegalKnightMoves(int startSquare, int piece, const MoveLines& checkLines,
-                                                                const MoveLines& pinLines) {
+    stackvector<Move, MAX_PIECE_MOVES> generateKnightMoves(int startSquare, int piece, const MoveLines& checkLines,
+                                                           const MoveLines& pinLines) {
         stackvector<Move, MAX_PIECE_MOVES> moves;
+
+        MoveLine pinLine = getPinLine(pinLines, startSquare);
+
+        // If double check, gg (no moves)
+        MoveLine checkLine;
+        if (checkLines.size() > 1) return moves;
+        if (checkLines.size() == 1) checkLine = checkLines[0];
 
         for (int rankOff = -2; rankOff <= 2; rankOff++) {
             for (int fileOff = -2; fileOff <= 2; fileOff++) {
-                int targetSquare = startSquare + fileOff + rankOff * 8;
+                int destSquare = startSquare + fileOff + rankOff * 8;
                 if (abs(rankOff) + abs(fileOff) != 3) continue;
-                if (!Square::isOnBoard(targetSquare)) continue;
-                if (Square::rank(targetSquare) != Square::rank(startSquare) + rankOff) continue;
-                if (Square::file(targetSquare) != Square::file(startSquare) + fileOff) continue;
+                if (!Square::isOnBoard(destSquare)) continue;
+                if (Square::rank(destSquare) != Square::rank(startSquare) + rankOff) continue;
+                if (Square::file(destSquare) != Square::file(startSquare) + fileOff) continue;
 
-                if (Piece::isColor(getPiece(targetSquare), m_turn)) continue;
+                if (Piece::isColor(getPiece(destSquare), m_turn)) continue;
 
-                moves.push_back(Move(startSquare, targetSquare));
+                Move candidateMove = Move(startSquare, destSquare);
+
+                if (inValidMoveLines(candidateMove, checkLine, pinLine)) moves.push_back(candidateMove);
             }
         }
         return moves;

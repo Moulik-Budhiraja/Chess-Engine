@@ -3,8 +3,10 @@ Static Evaluation: Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
--800
+Check Line: From: -1 To: -1
+940
 Is Checkmate: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
@@ -13,8 +15,36 @@ Legal Moves: Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
-a5b4 a5c3 a5b6 b7a6 b7c6 b7d5 b7e4 b7f3 b7g2 b7h1 a8b8 c8b8 c8d8                                                                                                                                                                                                             
 Check Line: From: -1 To: -1
+g1f3 g1h3 h1h2 h1h3 b2b3 b2b4 b2a3 c2c3 c2c4 e2d1 e2f1 e2f3 e2g4 e2h5 f2f3 f2f4 d3d2 d3d1 d3d4 d3c3 d3b3 d3a3 d3e3 d3f3 g3g4 h4h5 h4g5 a5a4 a5a3 a5a6 a5b5 a5c5 a5b4 a5c3 a5d2 a5b6 a5c7 d5c3 d5e3 d5b4 d5f4 d5b6 d5f6 d5c7 d5e7 d6c5 d6b4 d6a3 d6e5 d6f4 d6c7 d6e7 b7b8q b7b8r b7b8b b7b8q b7a8                                                                                                                                                                 
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Static Evaluation: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+-1440
+Is Checkmate: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+0
+Legal Moves: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+a3a2 a3a4 a3a5 a3b3 a3c3 a3d3 e4d2 e4f2 e4c3 e4g3 e4c5 e4d6 e4f6 g5g4 g5h4 a6a5 a6b6 a6c6 a6d6 a6b5 a6c4 a6d3 a6b7 a6c8 h6h5 c7c6 c7c5 c7d6 e7e6 e7e5 e7d6 f7f6 f7f5                                                                                                                                                                                         
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Static Evaluation: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+-940
+Is Checkmate: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+0
+Legal Moves: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+b3b2 b3b4 b3b5 b3b6 b3b7 b3a3 b3c3 b3d3 e4d2 e4f2 e4c3 e4g3 e4c5 e4d6 e4f6 g5g4 g5h4 a6a5 a6b6 a6c6 a6d6 a6b5 a6c4 a6d3 a6b7 h6h5 c7c6 c7c5 c7d6 e7e6 e7e5 e7d6 f7f6 f7f5 a8b8 a8c8 a8d8                                                                                                                                                                                     
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
@@ -23,7 +53,7 @@ Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
-800
+940
 Is Checkmate: Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
@@ -35,7 +65,7 @@ Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
-f1e2 f1g2 f1h3 h1h2 h1h3 c3d2 c3b4 c3a5 d4e3 d4c5 d4b6 d4a7 d4e5 d4f6 d4g7 d4h8                                                                                                                                                                                                          
+g1f3 g1h3 h1h2 h1h3 b2b3 b2b4 b2a3 c2c3 c2c4 e2d1 e2f1 e2f3 e2g4 e2h5 f2f3 f2f4 d3d2 d3d1 d3d4 d3c3 d3b3 d3a3 d3e3 d3f3 g3g4 h4h5 h4g5 a5a4 a5a3 a5a6 a5b5 a5c5 a5b4 a5c3 a5d2 a5b6 a5c7 d5c3 d5e3 d5b4 d5f4 d5b6 d5f6 d5c7 d5e7 d6c5 d6b4 d6a3 d6e5 d6f4 d6c7 d6e7 b7b8q b7b8r b7b8b b7b8q b7a8                                                                                                                                                                 
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
@@ -44,9 +74,26 @@ Check Line: From: -1 To: -1
 Static Evaluation: Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
-Check Line: From: -1 To: -1
--800
+-940
 Is Checkmate: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+0
+Legal Moves: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+a3a2 a3a4 a3a5 a3b3 a3c3 a3d3 e4d2 e4f2 e4c3 e4g3 e4c5 e4d6 e4f6 g5g4 g5h4 a6a5 a6b6 a6c6 a6d6 a6b5 a6c4 a6d3 a6b7 a6c8 h6h5 c7c6 c7c5 c7d6 e7e6 e7e5 e7d6 f7f6 f7f5 a8b8                                                                                                                                                                                        
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Static Evaluation: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+0
+Is Checkmate: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
@@ -55,8 +102,25 @@ Legal Moves: Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
-a5b4 a5c3 a5b6 b7a6 b7c6 b7d5 b7e4 b7f3 b7g2 b7h1 b7c8 a8b8 a8c8 d8c8 d8b8                                                                                                                                                                                                           
 Check Line: From: -1 To: -1
+b1a3 b1c3 g1f3 g1h3 a2a3 a2a4 b2b3 b2b4 c2c3 c2c4 d2d3 d2d4 e2e3 e2e4 f2f3 f2f4 g2g3 g2g4 h2h3 h2h4                                                                                                                                                                                                      
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Static Evaluation: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+-940
+Is Checkmate: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+0
+Legal Moves: Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+Check Line: From: -1 To: -1
+b3b2 b3b4 b3b5 b3b6 b3b7 b3a3 b3c3 b3d3 e4d2 e4f2 e4c3 e4g3 e4c5 e4d6 e4f6 g5g4 g5h4 a6a5 a6b6 a6c6 a6d6 a6b5 a6c4 a6d3 a6b7 h6h5 c7c6 c7c5 c7d6 e7e6 e7e5 e7d6 f7f6 f7f5 a8b8 a8c8 a8d8                                                                                                                                                                                     
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
 Check Line: From: -1 To: -1
