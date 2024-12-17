@@ -90,3 +90,5 @@ string arrToString(const array<string, N>& arr) {
 
     return result;
 }
+
+bool inBetween(int num, int a, int b) { return a < b ? a <= num && b >= num : b <= num && a >= num; }

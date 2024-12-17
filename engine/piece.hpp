@@ -18,11 +18,14 @@ constexpr int BLACK = 16;
 constexpr int TYPE_MASK = 0b111;
 constexpr int COLOR_MASK = 0b11000;
 
-bool isColor(int piece, int color) { return (piece & COLOR_MASK) == color; }
-bool isType(int piece, int type) { return (piece & TYPE_MASK) == type; }
+inline bool isColor(int piece, int color) { return (piece & COLOR_MASK) == color; }
+inline bool isType(int piece, int type) { return (piece & TYPE_MASK) == type; }
 
 inline int getPieceType(int piece) { return piece & TYPE_MASK; }
 inline int getColor(int piece) { return piece & COLOR_MASK; }
+
+// Warning: Undefined behaviour for non color input
+inline int getOppositeColor(int color) { return color ^ 0b11000; }
 
 int fromChar(char c) {
     int piece = 0;

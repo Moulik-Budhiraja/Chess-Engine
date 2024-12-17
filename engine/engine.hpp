@@ -54,7 +54,7 @@ class Engine {
         m_debugStream << "Is Checkmate: " << m_board.isCheckmate() << endl;
         m_debugStream << "Legal Moves: " << arrToString(Move::getUciArr(m_board.generateLegalMoves())) << endl;
 
-        moveSearch();
+        // moveSearch();
     }
 
     void makePseudoLegalMove(Move move) { m_board.makePseudoLegalMove(move); }

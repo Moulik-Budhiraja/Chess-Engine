@@ -14,6 +14,7 @@
 #include "stackvector.hpp"
 
 using namespace std;
+using MoveLines = stackvector<MoveLine, MAX_MOVE_LINES>;
 
 // Keeps track of last move data - used to unmake a move
 struct MoveDelta {
@@ -278,114 +279,71 @@ class Board {
 
     stackvector<Move, MAX_MOVES> generateLegalMoves(bool capturesOnly = false) {
         stackvector<Move, MAX_MOVES> moves;
-        stackvector<Move, 10> kingMoves;
+        MoveLines pinLines = generateMoveLines(m_turn, MoveLine::PIN);
+        MoveLines checkLines = generateMoveLines(m_turn, MoveLine::CHECK);
 
-        for (Move move : generatePseudoLegalMoves()) {
-            MoveDelta delta = makePseudoLegalMove(move);
+        for (int square : Square::ALL_SQUARES) {
+            if (getPiece(square) == Piece::NONE) continue;
+            if (!Piece::isColor(getPiece(square), m_turn)) continue;
 
-            m_turn = getNextTurn();
-            bool check = isCheck();
-
-            m_turn = getNextTurn();
-            unmakeLastMove();
-
-            if (capturesOnly && delta.takenPiece == Piece::NONE) continue;
-
-            if (!check && Piece::getPieceType(getPiece(move.getFrom())) != Piece::KING) {
-                moves.push_back(move);
-            } else if (!check) {
-                kingMoves.push_back(move);
-            }
-        }
-
-        bool check = isCheck();
-
-        for (Move move : kingMoves) {
-            if (abs(move.dx()) <= 1) {
-                moves.push_back(move);
-                continue;
-            }
-
-            if (check) continue;
-
-            for (Move findMove : kingMoves) {
-                if (findMove.getTo() == (move.getTo() - move.dx() / 2)) {
-                    moves.push_back(move);
-                    break;
-                }
-            }
+            moves.append(generateMovesForPiece(square, getPiece(square), checkLines, pinLines));
         }
 
         return moves;
     }
 
-    stackvector<Move, MAX_MOVES> generatePseudoLegalMoves() { return generatePseudoLegalMoves(false); }
-    stackvector<Move, MAX_MOVES> generatePseudoLegalMoves(bool capturesOnly, int turn) {
-        int originalTurn = m_turn;
-        m_turn = turn;
-        stackvector<Move, MAX_MOVES> moves = generatePseudoLegalMoves(capturesOnly);
-        m_turn = originalTurn;
-        return moves;
-    }
-    stackvector<Move, MAX_MOVES> generatePseudoLegalMoves(bool capturesOnly) {
-        stackvector<Move, MAX_MOVES> moves;
-
-        for (int pos : Square::ALL_SQUARES) {
-            int piece = getPiece(pos);
-            if (Piece::isColor(piece, m_turn)) {
-                stackvector<Move, MAX_PIECE_MOVES> pieceMoves = generateMoves(pos, piece);
-                moves.append(pieceMoves);
-            }
-        }
-
-        return moves;
-    }
-
-    stackvector<Move, MAX_PIECE_MOVES> generateMoves(int startSquare, int piece) {
+    stackvector<Move, MAX_PIECE_MOVES> generateMovesForPiece(int startSquare, int piece, const MoveLines& checkLines,
+                                                             const MoveLines& pinLines) {
         stackvector<Move, MAX_PIECE_MOVES> moves;
 
         switch (Piece::getPieceType(piece)) {
             case Piece::BISHOP:
             case Piece::ROOK:
             case Piece::QUEEN:
-                generateSlidingMoves(startSquare, piece);
-                moves.append(generateSlidingMoves(startSquare, piece));
+                moves.append(generateSlidingMoves(startSquare, piece, checkLines, pinLines));
                 break;
+                // case Piece::PAWN:
+                //     moves.append(generatePawnMoves(startSquare, piece));
+                //     break;
 
-            case Piece::PAWN:
-                generatePawnMoves(startSquare, piece);
-                moves.append(generatePawnMoves(startSquare, piece));
-                break;
+                // case Piece::KNIGHT:
+                //     moves.append(generateLegalKnightMoves(startSquare, piece));
+                //     break;
 
-            case Piece::KNIGHT:
-                moves.append(generateKnightMoves(startSquare, piece));
-                break;
-
-            case Piece::KING:
-                moves.append(generateKingMoves(startSquare, piece));
-                break;
+                // case Piece::KING:
+                //     moves.append(generateKingMoves(startSquare, piece));
+                //     break;
 
             default:
                 break;
         }
 
-        // cout << "Generated moves for piece at " << Square::toUci(startSquare) << ": ";
-        // cout << vecToString(Move::getUciList(pieceMoves, true)) << endl;
-
         return moves;
     }
 
-    stackvector<Move, MAX_PIECE_MOVES> generateSlidingMoves(int startSquare, int piece) {
+    stackvector<Move, MAX_PIECE_MOVES> generateSlidingMoves(int startSquare, int piece, const MoveLines& checkLines,
+                                                            const MoveLines& pinLines) {
         int startDirIndex = Piece::isType(piece, Piece::BISHOP) ? 4 : 0;
         int endDirIndex = Piece::isType(piece, Piece::ROOK) ? 4 : 8;
 
         stackvector<Move, MAX_PIECE_MOVES> moves;
+
+        MoveLine pinLine = getPinLine(pinLines, startSquare);
+
+        // If double check, gg (no moves)
+        MoveLine checkLine;
+        if (checkLines.size() > 1) return moves;
+        if (checkLines.size() == 1) checkLine = checkLines[0];
+
+        m_debugStream << "Check Line: From: " << checkLine.getFrom() << " To: " << checkLine.getTo() << endl;
 
         for (int dirIndex = startDirIndex; dirIndex < endDirIndex; dirIndex++) {
             int dir = Square::DIRECTIONS[dirIndex];
 
             // Go only the number of squares in the direction that actually exist
             for (int i = 0; i < Square::MAX_SLIDING_DISTANCE[startSquare][dirIndex]; i++) {
+                Move candidateMove;
+
                 int destSquare = startSquare + dir * (i + 1);
                 if (!Square::isOnBoard(destSquare)) {
                     break;
@@ -394,12 +352,15 @@ class Board {
                 int destPiece = getPiece(destSquare);
 
                 if (destPiece == Piece::NONE) {
-                    moves.push_back(Move(startSquare, destSquare));
+                    candidateMove = Move(startSquare, destSquare);
+                    if (inValidMoveLines(candidateMove, checkLine, pinLine)) moves.push_back(candidateMove);
+
                 } else {
                     if (Piece::isColor(destPiece, m_turn)) {
                         break;
                     } else {
-                        moves.push_back(Move(startSquare, destSquare));
+                        candidateMove = Move(startSquare, destSquare);
+                        if (inValidMoveLines(candidateMove, checkLine, pinLine)) moves.push_back(candidateMove);
                         break;
                     }
                 }
@@ -409,7 +370,8 @@ class Board {
         return moves;
     }
 
-    stackvector<Move, MAX_PIECE_MOVES> generatePawnMoves(int startSquare, int piece) {
+    stackvector<Move, MAX_PIECE_MOVES> generatePawnMoves(int startSquare, int piece, const MoveLines& checkLines,
+                                                         const MoveLines& pinLines) {
         stackvector<Move, MAX_PIECE_MOVES> moves;
 
         int dir = Piece::isColor(piece, Piece::WHITE) ? 8 : -8;
@@ -454,7 +416,8 @@ class Board {
         return moves;
     }
 
-    stackvector<Move, MAX_PIECE_MOVES> generateKnightMoves(int startSquare, int piece) {
+    stackvector<Move, MAX_PIECE_MOVES> generateLegalKnightMoves(int startSquare, int piece, const MoveLines& checkLines,
+                                                                const MoveLines& pinLines) {
         stackvector<Move, MAX_PIECE_MOVES> moves;
 
         for (int rankOff = -2; rankOff <= 2; rankOff++) {
@@ -473,7 +436,8 @@ class Board {
         return moves;
     }
 
-    stackvector<Move, MAX_PIECE_MOVES> generateKingMoves(int startSquare, int piece) {
+    stackvector<Move, MAX_PIECE_MOVES> generateKingMoves(int startSquare, int piece, const MoveLines& checkLines,
+                                                         const MoveLines& pinLines) {
         stackvector<Move, MAX_PIECE_MOVES> moves;
 
         for (int rankOff = -1; rankOff <= 1; rankOff++) {
@@ -522,6 +486,85 @@ class Board {
 
     stackvector<int, NUM_SQUARES> getPieceLocations(int piece) {
         return BitBoard::getToggled(m_bitboards[BitBoard::getBoardIndex(piece)]);
+    }
+
+    // 0 - checkLine, 1 - pinLine
+    // Warning: Only calculates for a single king
+    MoveLines generateMoveLines(int kingColor, int lineType) {
+        MoveLines pinLines;
+
+        auto kingLocations = getPieceLocations(kingColor | Piece::KING);
+
+        if (kingLocations.size() == 0) return pinLines;
+
+        int kingSquare = kingLocations[0];
+
+        // Pin line exists if there is a sliding piece of the opposite color after only a single friendly piece
+        for (int dirIndex = 0; dirIndex < 8; dirIndex++) {
+            int dir = Square::DIRECTIONS[dirIndex];
+            int blockingPieces = 0;
+
+            // Go only the number of squares in the direction that actually exist
+            for (int i = 0; i < Square::MAX_SLIDING_DISTANCE[kingSquare][dirIndex]; i++) {
+                int destSquare = kingSquare + dir * (i + 1);
+
+                if (!Square::isOnBoard(destSquare)) {
+                    break;
+                }
+
+                int destPiece = getPiece(destSquare);
+
+                if (destPiece == Piece::NONE) continue;
+
+                if ((destPiece == Piece::getOppositeColor(kingColor | Piece::QUEEN)) ||
+                    (destPiece == Piece::getOppositeColor(kingColor | Piece::ROOK) && dirIndex < 4) ||
+                    (destPiece == Piece::getOppositeColor(kingColor | Piece::BISHOP) && dirIndex >= 4)) {
+                    if (blockingPieces == lineType) {
+                        pinLines.push_back(MoveLine(kingSquare, destSquare));
+                        break;
+                    }
+                } else {
+                    blockingPieces++;
+                }
+
+                if (blockingPieces > 1) break;
+            }
+        }
+
+        return pinLines;
+    }
+
+    MoveLine getPinLine(const MoveLines& pinLines, int square) {
+        for (MoveLine pinLine : pinLines) {
+            if (pinLine.inLine(square)) return pinLine;
+        }
+
+        return MoveLine();
+    }
+
+    bool inValidMoveLines(const Move& candidateMove, const MoveLine& checkLine, const MoveLine& pinLine) {
+        // No check, not pinned
+        if (checkLine.isNull() && pinLine.isNull()) {
+            return true;
+        }
+
+        // Move must block the check, not pinned
+        if (!checkLine.isNull() && pinLine.isNull() && checkLine.inLine(candidateMove.getTo())) {
+            return true;
+        }
+
+        // No check, Move must stay within pin
+        if (checkLine.isNull() && !pinLine.isNull() && pinLine.inLine(candidateMove.getTo())) {
+            return true;
+        }
+
+        // Check and pinned, must block check and stay in pin
+        if (!checkLine.isNull() && !pinLine.isNull() && pinLine.inLine(candidateMove.getTo()) &&
+            checkLine.inLine(candidateMove.getTo())) {
+            return true;
+        }
+
+        return false;
     }
 
     bool isAttackedByPawn(int square, int attackerColor) {
@@ -584,9 +627,9 @@ class Board {
                         break;
                     else if (Piece::isType(destPiece, Piece::QUEEN))
                         return true;
-                    else if (Piece::isType(destPiece, Piece::BISHOP) && i < 4)
+                    else if (Piece::isType(destPiece, Piece::ROOK) && dirIndex < 4)
                         return true;
-                    else if (Piece::isType(destPiece, Piece::ROOK) && i >= 4)
+                    else if (Piece::isType(destPiece, Piece::BISHOP) && dirIndex >= 4)
                         return true;
                     else
                         break;

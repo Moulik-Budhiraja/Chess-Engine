@@ -8,6 +8,7 @@
 
 #define MAX_MOVES 218       // Max moves in a chess position
 #define MAX_PIECE_MOVES 27  // Max moves a single piece can make
+#define MAX_MOVE_LINES 8
 
 using namespace std;
 
@@ -65,6 +66,56 @@ char toChar(int flag) {
 
 }  // namespace Flag
 
+class MoveLine {
+   private:
+    int m_from;
+    int m_to;
+
+   public:
+    static const int CHECK = 0;
+    static const int PIN = 1;
+
+    // Null MoveLine
+    MoveLine() : m_from(-1), m_to(-1) {}
+
+    // Defined MoveLine
+    MoveLine(int from, int to) : m_from(from), m_to(to) {}
+
+    inline int getFrom() const { return m_from; }
+    inline int getTo() const { return m_to; }
+
+    bool isNull() const { return m_from == -1 && m_to == -1; }
+
+    // Returns if square falls within the pin line
+    bool inLine(int square) const {
+        // Horizontal pin
+        if (Square::rank(m_from) == Square::rank(m_to) && Square::file(m_from) != Square::file(m_to)) {
+            return Square::rank(square) == Square::rank(m_from) &&
+                   inBetween(Square::file(square), Square::file(m_from), Square::file(m_to));
+        }
+
+        // Vertical pin
+        if (Square::rank(m_from) != Square::rank(m_to) && Square::file(m_from) == Square::file(m_to)) {
+            return Square::file(square) == Square::file(m_from) &&
+                   inBetween(Square::rank(square), Square::rank(m_from), Square::rank(m_to));
+        }
+
+        // Upward Diagonal
+        if ((m_from - m_to) % 9 == 0 && (m_from - square) % 9 == 0 &&
+            abs(Square::rank(m_from) - Square::rank(square)) == abs(Square::file(m_from) - Square::file(square))) {
+            return inBetween(square, m_from, m_to);
+        }
+
+        // Downward Diagonal
+        if ((m_from - m_to) % 7 == 0 && (m_from - square) % 7 == 0 &&
+            abs(Square::rank(m_from) - Square::rank(square)) == abs(Square::file(m_from) - Square::file(square))) {
+            return inBetween(square, m_from, m_to);
+        }
+
+        return false;
+    }
+};
+
 class Move {
    private:
     int m_from;
@@ -92,6 +143,7 @@ class Move {
     inline int dx() const { return Square::file(m_to) - Square::file(m_from); }
     inline int dy() const { return Square::rank(m_to) - Square::rank(m_from); }
 
+    inline bool isNull() const { return m_from == 0 && m_to == 0 && m_flags == 0; }
     inline int isPromotion() const { return m_flags != Flag::NONE; }
     int getPromotionPiece() const {
         switch (m_flags) {
