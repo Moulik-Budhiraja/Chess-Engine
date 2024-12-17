@@ -1,0 +1,35 @@
+EngineInterface initialized
+Static Evaluation: -100
+Is Checkmate: 0
+Legal Moves: a1a2 a1a3 a1a4 a1a5 a1a6 a1a7 a1a8 b1d2 b1a3 b1c3 c1d2 c1e3 c1f4 c1g5 c1h6 d1d2 d1d3 d1c2 d1b3 d1a4 d1e2 d1f3 d1g4 d1h5 f1e2 f1d3 f1c4 g1e2 g1f3 g1h3 b2b3 b2b4 f2f3 f2f4 g2g3 g2g4 h2h3 h2h4 d4d5 e4e5 e1d2 e1e2                                                                                                                                                                                
+Searching Position: 
+---------------------------------
+| r | n | b | q | k | b | n | r |
+---------------------------------
+|   |   | p |   | p | p | p | p |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+|   | p |   |   |   |   |   |   |
+---------------------------------
+|   |   | p | P | P |   |   |   |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+|   | P |   |   |   | P | P | P |
+---------------------------------
+| R | N | B | Q | K | B | N | R |
+---------------------------------
+
+Board Fen: rnbqkbnr/2p1pppp/8/1p6/2pPP3/8/1P3PPP/RNBQKBNR w KQkq - 0 1
+
+Evaluating Line: f2f3 a8a1 b1a3 b8a6 a3b5		Eval: -500
+Evaluating Line: d1h5 a8a1 h5b5 c7c6 b5b8		Eval: -200
+Evaluating Line: a1a3 c8b7 a3a8 b7a8 f1c4		Eval: 0
+Evaluating Line: a1a8 c8b7 a8a7 b7e4 c1e3		Eval: 300
+Best Move: a1a8
+
+Search Time: 8113ms
+Positions Searched: 622516
+
+
