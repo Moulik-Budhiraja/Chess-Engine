@@ -54,7 +54,7 @@ string vecToString(const vector<string>& vec, bool noFormat, int start) {
     return result;
 }
 
-string vecToString(const vector<string>& vec, bool noFormat, int start, int end) {
+string vecToString(const vector<string>& vec, bool noFormat, size_t start, size_t end) {
     if (!noFormat) {
         return vecToString(vec);
     }

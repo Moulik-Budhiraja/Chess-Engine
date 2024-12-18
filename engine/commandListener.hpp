@@ -47,7 +47,7 @@ class EngineInterface {
         if (args[0] == "startpos") {
             m_engine.newGame();
 
-            for (int i = 1; i < args.size(); i++) {
+            for (size_t i = 1; i < args.size(); i++) {
                 m_engine.makePseudoLegalMove(Move(args[i]));
             }
 
@@ -65,8 +65,30 @@ class EngineInterface {
 
     // Stub for the 'go' command
     void go(const vector<string>& args) {
-        cout << "Go command called with args: " << vecToString(args) << "\n";
+        if (args.empty()) {
+            cout << "Go command called no args" << endl;
+            return;
+        }
+
+        string firstArg = args[0];
+
+        if (firstArg == "perft") {
+            vector<string> restArgs(args.begin() + 1, args.end());
+            perft(restArgs);
+        }
+
         // Here you would implement the search algorithm based on provided parameters
+    }
+
+    void perft(const vector<string>& args) {
+        if (args.empty()) {
+            cout << "Perft command called no args, please pass depth" << endl;
+            return;
+        }
+
+        int depth = stoi(args[0]);
+
+        cout << m_engine.perft(depth) << endl;
     }
 
     void getfen() { cout << m_engine.getFen() << "\n"; }

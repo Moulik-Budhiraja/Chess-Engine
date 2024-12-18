@@ -29,19 +29,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useState } from "react";
 import Arrow from "./Arrow";
 
-const emptyBoard = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, () => Piece.ROOK | Piece.WHITE)
-);
-
-for (let i = 0; i < 8; i++) {
-  emptyBoard[1][i] = Piece.PAWN | Piece.WHITE;
-  emptyBoard[6][i] = Piece.PAWN | Piece.BLACK;
-  emptyBoard[2][i] = Piece.NONE;
-  emptyBoard[3][i] = Piece.NONE;
-  emptyBoard[4][i] = Piece.NONE;
-  emptyBoard[5][i] = Piece.NONE;
-}
-
 type BoardProps = {
   startFen?: string;
   className?: string;

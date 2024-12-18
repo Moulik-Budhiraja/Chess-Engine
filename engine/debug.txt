@@ -1,42 +1,93 @@
 EngineInterface initialized
-Static Evaluation: -100
-Is Checkmate: 0
-Legal Moves: a1a2 a1a3 b1d2 b1a3 b1c3 c1d2 c1e3 c1f4 c1g5 c1h6 d1d2 d1d3 d1c2 d1b3 d1e2 d1f3 d1g4 d1h5 f1e2 f1d3 f1c4 g1e2 g1f3 g1h3 b2b3 b2b4 f2f3 f2f4 g2g3 g2g4 h2h3 h2h4 a4a5 a4b5 d4d5 e4e5 e1d2 e1e2                                                                                                                                                                                    
-Searching Position: 
+Static Evaluation: 0
+Is Check: 1
+Total Moves: 6
 ---------------------------------
-| r | n | b | q | k | b | n | r |
+| r | n | b | q |   | k |   | r |
 ---------------------------------
-|   |   | p |   | p | p | p | p |
+| p | p |   | P | b | p | p | p |
 ---------------------------------
-| p |   |   |   |   |   |   |   |
----------------------------------
-|   | p |   |   |   |   |   |   |
----------------------------------
-| P |   | p | P | P |   |   |   |
+|   |   | p | Q |   |   |   |   |
 ---------------------------------
 |   |   |   |   |   |   |   |   |
 ---------------------------------
-|   | P |   |   |   | P | P | P |
+|   |   | B |   |   |   |   |   |
 ---------------------------------
-| R | N | B | Q | K | B | N | R |
+|   |   |   | n |   |   |   |   |
+---------------------------------
+| P | P | P |   | N |   | P | P |
+---------------------------------
+| R | N | B |   | K |   |   | R |
 ---------------------------------
 
-Board Fen: rnbqkbnr/2p1pppp/p7/1p6/P1pPP3/8/1P3PPP/RNBQKBNR w KQkq - 0 1
+Board Fen: rnbq1k1r/pp1Pbppp/2pQ4/8/2B5/3n4/PPP1N1PP/RNB1K2R w KQ - 0 1
 
-Evaluating Line: g2g4 a8a7 a4b5 h7h5 g4h5		Eval: 100
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/1P6/p4PPP/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/8/pP2KPPP/1NB2BNR b kq - 1 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/8/pP1K1PPP/1NB2BNR b kq - 1 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/8/pP3PPP/1NBK1BNR b kq - 1 4
-rnbqkbnr/2p1pppp/p7/1p2P3/P2P4/8/pP3PPP/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/1p1P4/P3P3/8/pP3PPP/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/1P6/3PP3/8/pP3PPP/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/Pp6/3PP3/8/pP3PPP/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/7P/pP3PP1/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/6P1/pP3P1P/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/5P2/pP4PP/1NB1KBNR b Kkq - 0 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/8/pP1N1PPP/2B1KBNR b Kkq - 1 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/7N/pP3PPP/1NB1KB1R b Kkq - 1 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/5N2/pP3PPP/1NB1KB1R b Kkq - 1 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/8/pP2NPPP/1NB1KB1R b Kkq - 1 4
-rnbqkbnr/2p1pppp/p7/1p6/P2PP3/3B4/pP3PPP/1NB1K1NR b Kkq - 1 4
+Static Evaluation: 0
+Is Check: 0
+Total Moves: 28
+---------------------------------
+| r | n | b | q |   | k |   | r |
+---------------------------------
+| p | p |   | P | b | p | p | p |
+---------------------------------
+|   |   | p | Q |   |   |   |   |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+|   |   | B |   |   |   |   |   |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+| P | P | P |   | N | n | P | P |
+---------------------------------
+| R | N | B |   | K |   |   | R |
+---------------------------------
+
+Board Fen: rnbq1k1r/pp1Pbppp/2pQ4/8/2B5/8/PPP1NnPP/RNB1K2R b KQ - 0 1
+
+Static Evaluation: 0
+Is Check: 0
+Total Moves: 44
+---------------------------------
+| r | n | b | q |   | k |   | r |
+---------------------------------
+| p | p |   | P | b | p | p | p |
+---------------------------------
+|   |   | p |   |   |   |   |   |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+|   |   | B |   |   |   |   |   |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+| P | P | P |   | N | n | P | P |
+---------------------------------
+| R | N | B | Q | K |   |   | R |
+---------------------------------
+
+Board Fen: rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 0 1
+
+Static Evaluation: 0
+Is Check: 0
+Total Moves: 44
+---------------------------------
+| r | n | b | q |   | k |   | r |
+---------------------------------
+| p | p |   | P | b | p | p | p |
+---------------------------------
+|   |   | p |   |   |   |   |   |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+|   |   | B |   |   |   |   |   |
+---------------------------------
+|   |   |   |   |   |   |   |   |
+---------------------------------
+| P | P | P |   | N | n | P | P |
+---------------------------------
+| R | N | B | Q | K |   |   | R |
+---------------------------------
+
+Board Fen: rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8
+

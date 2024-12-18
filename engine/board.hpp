@@ -19,13 +19,13 @@ using MoveLines = stackvector<MoveLine, MAX_MOVE_LINES>;
 // Keeps track of last move data - used to unmake a move
 struct MoveDelta {
     int movedPiecePos;
-    int movedPieceEndPos;
     int takenPiece;
     int takenPiecePos;
-    int originalCastlingRights;
+    int movedPieceEndPos;
     int originalEnPassant;
     int originalHalfmove;
     bool promotion;
+    int originalCastlingRights;
 
     MoveDelta(int movedPiecePos, int takenPiecePos, int takenPiece, int originalEnPassant, int originalHalfmove,
               bool promotion, Move originalMove)
@@ -310,9 +310,9 @@ class Board {
                 moves.append(generateKnightMoves(startSquare, piece, checkLines, pinLines));
                 break;
 
-                // case Piece::KING:
-                //     moves.append(generateKingMoves(startSquare, piece));
-                //     break;
+            case Piece::KING:
+                moves.append(generateKingMoves(startSquare, piece, checkLines));
+                break;
 
             default:
                 break;
@@ -334,8 +334,6 @@ class Board {
         MoveLine checkLine;
         if (checkLines.size() > 1) return moves;
         if (checkLines.size() == 1) checkLine = checkLines[0];
-
-        m_debugStream << "Check Line: From: " << checkLine.getFrom() << " To: " << checkLine.getTo() << endl;
 
         for (int dirIndex = startDirIndex; dirIndex < endDirIndex; dirIndex++) {
             int dir = Square::DIRECTIONS[dirIndex];
@@ -374,19 +372,30 @@ class Board {
                                                          const MoveLines& pinLines) {
         stackvector<Move, MAX_PIECE_MOVES> moves;
 
+        MoveLine pinLine = getPinLine(pinLines, startSquare);
+
+        // If double check, gg (no moves)
+        MoveLine checkLine;
+        if (checkLines.size() > 1) return moves;
+        if (checkLines.size() == 1) checkLine = checkLines[0];
+
         int dir = Piece::isColor(piece, Piece::WHITE) ? 8 : -8;
 
         // Single move
         int destSquare = startSquare + dir;
         if (Square::isOnBoard(destSquare) && getPiece(destSquare) == Piece::NONE) {
-            if (Square::rank(destSquare) == 0 || Square::rank(destSquare) == 7) {
-                moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_QUEEN));
-                moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_ROOK));
-                moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_BISHOP));
-                moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_QUEEN));
+            Move candidateMove = Move(startSquare, destSquare);
 
-            } else {
-                moves.push_back(Move(startSquare, destSquare));
+            if (inValidMoveLines(candidateMove, checkLine, pinLine)) {
+                if (Square::rank(destSquare) == 0 || Square::rank(destSquare) == 7) {
+                    moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_QUEEN));
+                    moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_ROOK));
+                    moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_BISHOP));
+                    moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_KNIGHT));
+
+                } else {
+                    moves.push_back(Move(startSquare, destSquare));
+                }
             }
         }
 
@@ -395,7 +404,9 @@ class Board {
             (Piece::isColor(piece, Piece::BLACK) && Square::rank(startSquare) == 6)) {
             int doubleDestSquare = startSquare + 2 * dir;
             if (getPiece(destSquare) == Piece::NONE && getPiece(doubleDestSquare) == Piece::NONE) {
-                moves.push_back(Move(startSquare, doubleDestSquare));
+                Move candidateMove = Move(startSquare, doubleDestSquare);
+                if (inValidMoveLines(candidateMove, checkLine, pinLine))
+                    moves.push_back(Move(startSquare, doubleDestSquare));
             }
         }
 
@@ -405,11 +416,30 @@ class Board {
             if (Square::rank(destSquare) != Square::rank(startSquare + dir)) continue;
 
             if (Square::isOnBoard(destSquare) && Piece::isColor(getPiece(destSquare), m_turn ^ Piece::COLOR_MASK)) {
-                moves.push_back(Move(startSquare, destSquare));
+                Move candidateMove = Move(startSquare, destSquare);
+                if (inValidMoveLines(candidateMove, checkLine, pinLine)) {
+                    if (Square::rank(destSquare) == 0 || Square::rank(destSquare) == 7) {
+                        moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_QUEEN));
+                        moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_ROOK));
+                        moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_BISHOP));
+                        moves.push_back(Move(startSquare, destSquare, Flag::PROMOTION_KNIGHT));
+
+                    } else {
+                        moves.push_back(Move(startSquare, destSquare));
+                    }
+                }
             }
             // enpassant
             if (Square::isOnBoard(destSquare) && destSquare == m_enPassant) {
-                moves.push_back(Move(startSquare, destSquare));
+                Move candidateMove = Move(startSquare, destSquare);
+
+                makePseudoLegalMove(candidateMove);
+                m_turn = getNextTurn();
+                bool causedCheck = isCheck();
+                m_turn = getNextTurn();
+                unmakeLastMove();
+
+                if (!causedCheck) moves.push_back(candidateMove);
             }
         }
 
@@ -445,9 +475,10 @@ class Board {
         return moves;
     }
 
-    stackvector<Move, MAX_PIECE_MOVES> generateKingMoves(int startSquare, int piece, const MoveLines& checkLines,
-                                                         const MoveLines& pinLines) {
+    stackvector<Move, MAX_PIECE_MOVES> generateKingMoves(int startSquare, int piece, const MoveLines& checkLines) {
         stackvector<Move, MAX_PIECE_MOVES> moves;
+
+        bool inCheck = checkLines.size() != 0;
 
         for (int rankOff = -1; rankOff <= 1; rankOff++) {
             for (int fileOff = -1; fileOff <= 1; fileOff++) {
@@ -458,36 +489,82 @@ class Board {
                 if (Square::file(targetSquare) != Square::file(startSquare) + fileOff) continue;
                 if (Piece::isColor(getPiece(targetSquare), m_turn)) continue;
 
-                moves.push_back(Move(startSquare, targetSquare));
+                // Make sure the move doesn't put the king in check
+                Move candidateMove = Move(startSquare, targetSquare);
+
+                makePseudoLegalMove(candidateMove);
+                m_turn = getNextTurn();
+                bool causedCheck = isCheck();
+                m_turn = getNextTurn();
+                unmakeLastMove();
+
+                if (!causedCheck) moves.push_back(candidateMove);
             }
         }
+
+        if (inCheck) return moves;  // Don't bother calculating castling if in check
 
         // Castling
         int rights = m_castling & (Piece::isColor(piece, Piece::WHITE) ? 0b1100 : 0b11);
         rights = rights >> (Piece::isColor(piece, Piece::WHITE) ? 2 : 0);
 
-        // cout << rights;
-
         // Queen side
         if (rights & 0b01) {
             bool blocked = false;
+            bool passesCheck = true;
             for (int fileOff = 1; fileOff <= 3; fileOff++) {
                 if (getPiece(Square::rank(startSquare), Square::file(startSquare) - fileOff) != Piece::NONE)
                     blocked = true;
             }
 
-            if (!blocked) moves.push_back(Move(startSquare, startSquare - 2));
+            for (Move move : moves) {
+                if (move.getTo() == startSquare - 1) {
+                    passesCheck = false;
+                    break;
+                }
+            }
+
+            if (!blocked && !passesCheck) {
+                Move candidateMove = Move(startSquare, startSquare - 2);
+
+                makePseudoLegalMove(candidateMove);
+                m_turn = getNextTurn();
+                bool causedCheck = isCheck();
+                m_turn = getNextTurn();
+                unmakeLastMove();
+
+                if (!causedCheck) moves.push_back(candidateMove);
+            }
         }
 
         // King side
         if (rights & 0b10) {
             bool blocked = false;
+            bool passesCheck = true;
+
             for (int fileOff = 1; fileOff <= 2; fileOff++) {
                 if (getPiece(Square::rank(startSquare), Square::file(startSquare) + fileOff) != Piece::NONE)
                     blocked = true;
             }
 
-            if (!blocked) moves.push_back(Move(startSquare, startSquare + 2));
+            for (Move move : moves) {
+                if (move.getTo() == startSquare + 1) {
+                    passesCheck = false;
+                    break;
+                }
+            }
+
+            if (!blocked && !passesCheck) {
+                Move candidateMove = Move(startSquare, startSquare + 2);
+
+                makePseudoLegalMove(candidateMove);
+                m_turn = getNextTurn();
+                bool causedCheck = isCheck();
+                m_turn = getNextTurn();
+                unmakeLastMove();
+
+                if (!causedCheck) moves.push_back(candidateMove);
+            }
         }
 
         return moves;
@@ -500,11 +577,11 @@ class Board {
     // 0 - checkLine, 1 - pinLine
     // Warning: Only calculates for a single king
     MoveLines generateMoveLines(int kingColor, int lineType) {
-        MoveLines pinLines;
+        MoveLines moveLines;
 
         auto kingLocations = getPieceLocations(kingColor | Piece::KING);
 
-        if (kingLocations.size() == 0) return pinLines;
+        if (kingLocations.size() == 0) return moveLines;
 
         int kingSquare = kingLocations[0];
 
@@ -529,7 +606,7 @@ class Board {
                     (destPiece == Piece::getOppositeColor(kingColor | Piece::ROOK) && dirIndex < 4) ||
                     (destPiece == Piece::getOppositeColor(kingColor | Piece::BISHOP) && dirIndex >= 4)) {
                     if (blockingPieces == lineType) {
-                        pinLines.push_back(MoveLine(kingSquare, destSquare));
+                        moveLines.push_back(MoveLine(kingSquare, destSquare));
                         break;
                     }
                 } else {
@@ -540,7 +617,19 @@ class Board {
             }
         }
 
-        return pinLines;
+        if (lineType == MoveLine::CHECK) {
+            for (int pos :
+                 BitBoard::getToggled(attackingPawnBitboard(kingSquare, Piece::getOppositeColor(kingColor)))) {
+                moveLines.push_back(MoveLine(pos, pos));
+            }
+
+            for (int pos :
+                 BitBoard::getToggled(attackingKnightBitboard(kingSquare, Piece::getOppositeColor(kingColor)))) {
+                moveLines.push_back(MoveLine(pos, pos));
+            }
+        }
+
+        return moveLines;
     }
 
     MoveLine getPinLine(const MoveLines& pinLines, int square) {
@@ -576,46 +665,62 @@ class Board {
         return false;
     }
 
-    bool isAttackedByPawn(int square, int attackerColor) {
+    uint64_t attackingPawnBitboard(int square, int attackerColor) {
         uint64_t squareBoard = 1ULL << square;
 
         uint64_t pawnAttacks = 0;
-        pawnAttacks |= (squareBoard & ~BitBoard::FILE_A) << 7;  // left
-        pawnAttacks |= (squareBoard & ~BitBoard::FILE_H) << 9;  // right
 
-        if (attackerColor == Piece::WHITE && (pawnAttacks >> 8 * 2) & getBitboard(Piece::WHITE | Piece::PAWN))
-            return true;
-        else if (attackerColor == Piece::BLACK && pawnAttacks & getBitboard(Piece::BLACK | Piece::PAWN))
-            return true;
+        if (attackerColor == Piece::WHITE) {
+            pawnAttacks |= (squareBoard & ~BitBoard::FILE_H) >> 9;  // left
+            pawnAttacks |= (squareBoard & ~BitBoard::FILE_A) >> 7;  // right
+        }
+        if (attackerColor == Piece::BLACK) {
+            pawnAttacks |= (squareBoard & ~BitBoard::FILE_H) << 9;  // right
+            pawnAttacks |= (squareBoard & ~BitBoard::FILE_A) << 7;  // left
+        }
 
+        return pawnAttacks & getBitboard(attackerColor | Piece::PAWN);
+    }
+
+    uint64_t attackingKnightBitboard(int square, int attackerColor) {
+        uint64_t piecePos = 1ULL << square;
+        uint64_t knightAttacks = 0;
+
+        // Check if a knight is giving check
+        knightAttacks |= (piecePos & ~BitBoard::FILE_A) << 15;                       // 2 up, 1 left
+        knightAttacks |= (piecePos & ~(BitBoard::FILE_A | BitBoard::FILE_B)) << 6;   // 1 up, 2 left
+        knightAttacks |= (piecePos & ~(BitBoard::FILE_A | BitBoard::FILE_B)) >> 10;  // 1 down, 2 left
+        knightAttacks |= (piecePos & ~BitBoard::FILE_A) >> 17;                       // 2 up, 1 left
+        knightAttacks |= (piecePos & ~BitBoard::FILE_H) << 17;                       // 2 up, 1 left
+        knightAttacks |= (piecePos & ~(BitBoard::FILE_H | BitBoard::FILE_G)) << 10;  // 1 up, 2 left
+        knightAttacks |= (piecePos & ~(BitBoard::FILE_H | BitBoard::FILE_G)) >> 6;   // 1 down, 2 left
+        knightAttacks |= (piecePos & ~BitBoard::FILE_H) >> 15;                       // 2 up, 1 left
+
+        return knightAttacks & getBitboard(attackerColor | Piece::KNIGHT);
+    }
+
+    bool isAttackedByPawn(int square, int attackerColor) {
+        if (attackingPawnBitboard(square, attackerColor)) return true;
+
+        return false;
+    }
+
+    bool isAttackedByKnight(int square, int attackerColor) {
+        if (attackingKnightBitboard(square, attackerColor)) return true;
         return false;
     }
 
     // Returns True if the current turn player is in check
     bool isCheck() {
         for (const auto& kingSquare : getPieceLocations(m_turn | Piece::KING)) {
-            uint64_t kingPos = 1ULL << kingSquare;
-
-            uint64_t pawnAttacks = 0;
-            uint64_t knightAttacks = 0;
-
             // Check if a pawn is giving check
-            if (isAttackedByPawn(kingSquare, getNextTurn())) return true;
-
-            // Check if a knight is giving check
-            knightAttacks |= (kingPos & ~BitBoard::FILE_A) << 15;                       // 2 up, 1 left
-            knightAttacks |= (kingPos & ~(BitBoard::FILE_A | BitBoard::FILE_B)) << 6;   // 1 up, 2 left
-            knightAttacks |= (kingPos & ~(BitBoard::FILE_A | BitBoard::FILE_B)) >> 10;  // 1 down, 2 left
-            knightAttacks |= (kingPos & ~BitBoard::FILE_A) >> 17;                       // 2 up, 1 left
-            knightAttacks |= (kingPos & ~BitBoard::FILE_H) << 17;                       // 2 up, 1 left
-            knightAttacks |= (kingPos & ~(BitBoard::FILE_H | BitBoard::FILE_G)) << 10;  // 1 up, 2 left
-            knightAttacks |= (kingPos & ~(BitBoard::FILE_H | BitBoard::FILE_G)) >> 6;   // 1 down, 2 left
-            knightAttacks |= (kingPos & ~BitBoard::FILE_H) >> 15;                       // 2 up, 1 left
-
-            if (m_turn == Piece::WHITE && knightAttacks & getBitboard(Piece::BLACK | Piece::KNIGHT))
+            if (isAttackedByPawn(kingSquare, getNextTurn())) {
                 return true;
-            else if (m_turn == Piece::BLACK && knightAttacks & getBitboard(Piece::WHITE | Piece::KNIGHT))
+            }
+
+            if (isAttackedByKnight(kingSquare, getNextTurn())) {
                 return true;
+            }
 
             // Check if a sliding piece is giving check
             for (int dirIndex = 0; dirIndex < 8; dirIndex++) {

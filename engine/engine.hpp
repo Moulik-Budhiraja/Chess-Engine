@@ -17,8 +17,8 @@ using namespace std;
 
 struct MoveEval {
     int eval;
-    int depth;
     Move bestMove;
+    int depth;
 
     MoveEval() : eval(INT_MIN), bestMove(Move(0, 0)), depth(0) {}
     MoveEval(int eval, int depth, Move bestMove) : eval(eval), bestMove(bestMove), depth(depth) {}
@@ -44,17 +44,33 @@ class Engine {
    public:
     // Constructor accepting a stream
     Engine(ostream& stream, ostream& debugStream)
-        : m_outputStream(stream), m_debugStream(debugStream), m_board(debugStream) {}
+        : m_board(debugStream), m_outputStream(stream), m_debugStream(debugStream) {}
 
     void newGame() { newGame("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"); }
     void newGame(string fen) {
         m_board.setBoard(fen);
 
         m_debugStream << "Static Evaluation: " << evaluate(0) << endl;
-        m_debugStream << "Is Checkmate: " << m_board.isCheckmate() << endl;
-        m_debugStream << "Legal Moves: " << arrToString(Move::getUciArr(m_board.generateLegalMoves())) << endl;
+        m_debugStream << "Is Check: " << m_board.isCheck() << endl;
+        // m_debugStream << "Is Checkmate: " << m_board.isCheckmate() << endl;
+        m_debugStream << "Total Moves: " << m_board.generateLegalMoves().size() << endl;
+        // m_debugStream << "Legal Moves: " << arrToString(Move::getUciArr(m_board.generateLegalMoves())) << endl;
+        m_debugStream << m_board.visualizeBoard() << endl;
 
         // moveSearch();
+
+        // for (int i = 1; i < 6; i++) {
+        //     chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+        //     int moves = moveTest(i);
+        //     chrono::steady_clock::time_point end = chrono::steady_clock::now();
+        //     m_debugStream << "Depth: " << i << " ply Result: " << moves
+        //                   << " positions Time: " << chrono::duration_cast<chrono::milliseconds>(end - begin).count()
+        //                   << "ms" << endl;
+        // }
+
+        // for (Move move : m_board.generateLegalMoves()) {
+        //     m_debugStream << move.toUci() << endl;
+        // }
     }
 
     void makePseudoLegalMove(Move move) { m_board.makePseudoLegalMove(move); }
@@ -80,7 +96,7 @@ class Engine {
                 return 0;
             }
 
-        } catch (out_of_range e) {
+        } catch (out_of_range const&) {
             m_debugStream << m_board.getFen() << endl;
             throw out_of_range("HI");
         }
@@ -137,8 +153,6 @@ class Engine {
         Move bestMove(0, 0);
         int bestDepth = INT_MIN;
 
-        bool foundBetterMove = false;
-
         for (Move move : moves) {
             array<Move, MAX_SEARCH_DEPTH> childPv{};
             m_board.makePseudoLegalMove(move);
@@ -163,7 +177,6 @@ class Engine {
                     pv[i] = childPv[i];
                 }
 
-                foundBetterMove = true;
                 // If at root depth, print this newly found best line
                 if (depth == MAX_SEARCH_DEPTH) {
                     m_debugStream << "Evaluating Line: " << arrToString(Move::getUciArr(pv)) << "\t\tEval: " << eval
@@ -216,6 +229,35 @@ class Engine {
     }
 
     string getFen() const { return m_board.getFen(); }
+
+    string perft(int depth) {
+        stringstream output;
+
+        output << "\n";
+
+        int val = moveTest(depth, depth, output);
+        output << "\nMoves searched: " << val << endl;
+
+        return output.str();
+    }
+
+    int moveTest(int depth, int topDepth, stringstream& output) {
+        if (depth == 0) return 1;
+
+        int total = 0;
+
+        for (Move move : m_board.generateLegalMoves()) {
+            m_board.makePseudoLegalMove(move);
+            int val = moveTest(depth - 1, topDepth, output);
+            total += val;
+            if (depth == topDepth) {
+                output << move.toUci() << ": " << val << endl;
+            }
+            m_board.unmakeLastMove();
+        }
+
+        return total;
+    }
 
     vector<Move> getLegalMoves() {
         vector<Move> moves;
