@@ -78,6 +78,7 @@ export class Engine {
       "-o",
       "../engine/engine",
       "../engine/main.cpp",
+      "-O3",
     ]);
 
     if (buildCmd.error) {
@@ -141,6 +142,17 @@ export class Engine {
   async getMoves() {
     try {
       const output = await this.sendCommand("getmoves");
+      return output;
+    } catch (error) {
+      console.error("Error getting moves:", error);
+    }
+  }
+
+  async getBestMove(depth: number, engineTime: number) {
+    try {
+      const output = await this.sendCommand(
+        `getbestmove ${depth} ${engineTime}`
+      );
       return output;
     } catch (error) {
       console.error("Error getting moves:", error);

@@ -71,3 +71,7 @@ export function GetPiece(piece: number): GetPieceReturn {
     pieceImage,
   };
 }
+
+export function getPieceColor(piece: number): number {
+  return piece & 0b11000;
+}

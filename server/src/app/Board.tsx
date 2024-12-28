@@ -10,7 +10,12 @@ import {
   boardToFen,
   STARTING_FEN,
 } from "@/utils/chess/BoardFromFen";
-import { GetPiece, Piece } from "@/utils/chess/GetPiece";
+import {
+  GetPiece,
+  getPieceColor,
+  Piece,
+  PieceColor,
+} from "@/utils/chess/GetPiece";
 import { serverLog } from "@/utils/debug/serverLog";
 import {
   DndContext,
@@ -28,11 +33,19 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useState } from "react";
 import Arrow from "./Arrow";
+import { solveBestMove } from "@/engine/engineFunctions/moves/getBestMove";
+import { get } from "http";
 
 type BoardProps = {
   startFen?: string;
+  engineDepth: number;
+  engineTime?: number;
   className?: string;
+  showEngine?: SideToggle;
+  playEngine?: SideToggle;
   onFenChange?: (fen: string) => void;
+  onMakeMove?: (move: MoveObj, newFen: string) => void;
+  onEvaluationChange?: (newEval: number) => void;
 };
 
 type ArrowObj = {
@@ -40,10 +53,27 @@ type ArrowObj = {
   to: number; // ending square index
 };
 
+export type SideToggle = {
+  forWhite: boolean;
+  forBlack: boolean;
+};
+
 export default function Board({
   startFen = STARTING_FEN,
+  engineDepth = 6,
+  engineTime = 500,
   className,
+  showEngine = {
+    forWhite: false,
+    forBlack: true,
+  },
+  playEngine = {
+    forWhite: false,
+    forBlack: false,
+  },
   onFenChange,
+  onMakeMove,
+  onEvaluationChange,
 }: BoardProps) {
   const [board, setBoard] = useState(boardFromFen(STARTING_FEN).board);
   const [turn, setTurn] = useState(boardFromFen(STARTING_FEN).turn);
@@ -58,11 +88,17 @@ export default function Board({
   const [selectedPos, setSelectedPos] = useState<number | null>(null);
   const [lastMove, setLastMove] = useState<MoveObj | null>(null);
 
+  // Show Promotion Window
+  const [showPromotion, setShowPromotion] = useState(false);
+  const [promotionMove, setPromotionMove] = useState<MoveObj | null>(null);
+
   // Arrow stuff
   const [arrows, setArrows] = useState<ArrowObj[]>([]);
   const [rightClickStartPos, setRightClickStartPos] = useState<number | null>(
     null
   );
+
+  const [bestMove, setBestMove] = useState<MoveObj | null>(null);
 
   useEffect(() => {
     const newBoard = boardFromFen(startFen).board;
@@ -77,51 +113,46 @@ export default function Board({
   }, [startFen]);
 
   useEffect(() => {
-    let pieceMoved: number | null = null;
-    if (lastMove) {
-      pieceMoved = board[lastMove?.to.y][lastMove?.to.x];
-    }
-
-    if (lastMove && pieceMoved && GetPiece(pieceMoved).type === Piece.PAWN) {
-      if (Math.abs(lastMove?.to.y - lastMove?.from.y) === 2) {
-        setEnPassant(
-          squareToUci(
-            lastMove?.to.y * 8 +
-              lastMove?.to.x +
-              ((pieceMoved & 0b11000) == Piece.WHITE ? -8 : 8)
-          )
-        );
-      } else {
-        setEnPassant("-");
-      }
-    }
-
-    if (lastMove && pieceMoved && GetPiece(pieceMoved).type !== Piece.PAWN) {
-      setEnPassant("-");
-    }
-
-    if (lastMove) {
-      setCastlingRights((prev) => {
-        const result = handleCastlingRights(board, lastMove, prev);
-        console.log("Setting castling rights", result);
-        return result;
-      });
-    }
-
     const fen = boardToFen(board, turn, castlingRights, enPassant, 0, 1);
     onFenChange?.(fen);
 
-    const handler = setTimeout(() => {
-      getValidMoves(fen).then((moves) => {
-        console.log("Setting valid moves", moves);
-        setValidMoves(moves);
-      });
+    const handler = setTimeout(async () => {
+      const moves = await getValidMoves(fen);
+
+      setValidMoves(moves);
+
+      const moveEval = await solveBestMove(fen, engineDepth, engineTime);
+
+      setBestMove(moveEval.move);
+      onEvaluationChange?.(moveEval.eval);
+
+      if (
+        (playEngine.forWhite && turn === Piece.WHITE) ||
+        (playEngine.forBlack && turn === Piece.BLACK)
+      ) {
+        const [newBoard, lastMove, promotion] = await handlePieceMove(
+          board,
+          moveEval.move.from.y,
+          moveEval.move.from.x,
+          moveEval.move.to.y,
+          moveEval.move.to.x,
+          moves,
+          moveEval.move.promotion
+        );
+
+        if (promotion) {
+          setPromotionMove(moveEval.move);
+          setShowPromotion(true);
+        } else {
+          handleMoveUpdate(newBoard, lastMove);
+        }
+      }
     }, 100);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [board, lastMove, castlingRights, enPassant]);
+  }, [board, lastMove, castlingRights, enPassant, engineDepth, engineTime]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -138,16 +169,17 @@ export default function Board({
       sensors={sensors}
       modifiers={[snapCenterToCursor]}
       onDragEnd={async (event) => {
-        const [newBoard, lastMove] = await handlePieceDrag(
+        const [newBoard, lastMove, promotion] = await handlePieceDrag(
           event,
           board,
           validMoves
         );
-        setBoard(newBoard);
-        setLastMove((prev) => lastMove ?? prev);
-        if (lastMove) {
-          setSelectedPos(null);
-          setTurn((prev) => (prev === Piece.WHITE ? Piece.BLACK : Piece.WHITE));
+
+        if (promotion) {
+          setPromotionMove(lastMove);
+          setShowPromotion(true);
+        } else {
+          handleMoveUpdate(newBoard, lastMove);
         }
       }}
       onDragStart={(event) => {
@@ -221,14 +253,14 @@ export default function Board({
                     move.from.x,
                     move.to.y,
                     move.to.x,
-                    validMoves
-                  ).then(([newBoard, lastMove]) => {
-                    setBoard(newBoard);
-                    setLastMove((prev) => lastMove ?? prev);
-                    if (lastMove) {
-                      setTurn((prev) =>
-                        prev === Piece.WHITE ? Piece.BLACK : Piece.WHITE
-                      );
+                    validMoves,
+                    null
+                  ).then(([newBoard, lastMove, promotion]) => {
+                    if (promotion) {
+                      setPromotionMove(move);
+                      setShowPromotion(true);
+                    } else {
+                      handleMoveUpdate(newBoard, lastMove);
                     }
                   });
                 }}
@@ -250,11 +282,149 @@ export default function Board({
           </div>
         ))}
 
+        {showPromotion && promotionMove && (
+          <PromotionWindow
+            promotionMove={promotionMove}
+            turn={turn}
+            setPromotionMove={(move) => {
+              setPromotionMove(null);
+              handlePieceMove(
+                board,
+                move.from.y,
+                move.from.x,
+                move.to.y,
+                move.to.x,
+                validMoves,
+                move.promotion
+              ).then(([newBoard, lastMove, promotion]) => {
+                handleMoveUpdate(newBoard, lastMove);
+                setShowPromotion(false);
+              });
+            }}
+          />
+        )}
+
         {arrows.map((arrow, i) => (
           <Arrow key={i} from={arrow.from} to={arrow.to} />
         ))}
+
+        {bestMove &&
+          board[bestMove.from.y][bestMove.from.x] !== Piece.NONE &&
+          turn === Piece.WHITE &&
+          showEngine.forWhite && (
+            <Arrow
+              from={bestMove.from.y * 8 + bestMove.from.x}
+              to={bestMove.to.y * 8 + bestMove.to.x}
+              color="green"
+            />
+          )}
+        {bestMove &&
+          board[bestMove.from.y][bestMove.from.x] !== Piece.NONE &&
+          turn === Piece.BLACK &&
+          showEngine.forBlack && (
+            <Arrow
+              from={bestMove.from.y * 8 + bestMove.from.x}
+              to={bestMove.to.y * 8 + bestMove.to.x}
+              color="green"
+            />
+          )}
       </div>
     </DndContext>
+  );
+
+  function handleMoveUpdate(newBoard: number[][], lastMove: MoveObj | null) {
+    setBoard(newBoard);
+    setLastMove((prev) => lastMove ?? prev);
+    if (lastMove) {
+      setSelectedPos(null);
+      setTurn((prev) => (prev === Piece.WHITE ? Piece.BLACK : Piece.WHITE));
+    }
+
+    let pieceMoved: number | null = null;
+    if (lastMove) {
+      pieceMoved = newBoard[lastMove?.to.y][lastMove?.to.x];
+    }
+
+    let enPassant = "-";
+
+    if (lastMove && pieceMoved && GetPiece(pieceMoved).type === Piece.PAWN) {
+      if (Math.abs(lastMove?.to.y - lastMove?.from.y) === 2) {
+        enPassant = squareToUci(
+          lastMove?.to.y * 8 +
+            lastMove?.to.x +
+            ((pieceMoved & 0b11000) == Piece.WHITE ? -8 : 8)
+        );
+        setEnPassant(enPassant);
+      } else {
+        setEnPassant("-");
+      }
+    }
+
+    if (lastMove && pieceMoved && GetPiece(pieceMoved).type !== Piece.PAWN) {
+      setEnPassant("-");
+    }
+
+    if (lastMove) {
+      setCastlingRights((prev) => {
+        const result = handleCastlingRights(newBoard, lastMove, prev);
+        console.log("Setting castling rights", result);
+        return result;
+      });
+    }
+
+    if (lastMove) {
+      const fen = boardToFen(
+        newBoard,
+        turn === Piece.WHITE ? Piece.BLACK : Piece.WHITE,
+        handleCastlingRights(newBoard, lastMove, castlingRights),
+        enPassant,
+        0,
+        1
+      );
+      onMakeMove?.(lastMove, fen);
+    }
+  }
+}
+
+type PromotionWindowProps = {
+  promotionMove: MoveObj;
+  turn: number;
+  setPromotionMove: (move: MoveObj) => void;
+};
+
+function PromotionWindow({
+  promotionMove,
+  turn,
+  setPromotionMove,
+}: PromotionWindowProps) {
+  return (
+    <div className="absolute bg-[#5a4136] drop-shadow-md z-50 w-68 h-20 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-2 flex">
+      {[Piece.QUEEN, Piece.ROOK, Piece.BISHOP, Piece.KNIGHT].map((piece) => (
+        <div
+          key={piece}
+          onClick={async () => {
+            setPromotionMove({
+              from: promotionMove.from,
+              to: promotionMove.to,
+              promotion: piece,
+            });
+
+            await serverLog("Setting promotion move", promotionMove);
+          }}
+          className={`w-16 h-16 cursor-pointer ${
+            piece % 2 == 1 ? "bg-[#ecd5bd]" : "bg-[#a77964]"
+          }`}
+        >
+          <img
+            src={GetPiece(piece | turn).pieceImage}
+            alt={`${GetPiece(piece | turn).colorName} ${
+              GetPiece(piece | turn).typeName
+            }`}
+            className="w-full h-full"
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -317,7 +487,7 @@ export function Square({
     <div
       ref={setNodeRef}
       className={`relative w-16 h-16 ${
-        (col + row) % 2 == 0 ? "bg-[#ecd5bd]" : "bg-[#a77964]"
+        (col + row) % 2 == 1 ? "bg-[#ecd5bd]" : "bg-[#a77964]"
       }`}
     >
       {highlightPos && (
@@ -403,11 +573,11 @@ async function handlePieceDrag(
   event: DragEndEvent,
   board: number[][],
   validMoves: MoveObj[]
-): Promise<[number[][], MoveObj | null]> {
+): Promise<[number[][], MoveObj | null, boolean]> {
   const { active, over } = event;
 
   if (!active || !over) {
-    return [board, null];
+    return [board, null, false];
   }
 
   const fromRow = active.data.current?.row;
@@ -415,7 +585,15 @@ async function handlePieceDrag(
   const toRow = over.data.current?.row;
   const toCol = over.data.current?.col;
 
-  return handlePieceMove(board, fromRow, fromCol, toRow, toCol, validMoves);
+  return handlePieceMove(
+    board,
+    fromRow,
+    fromCol,
+    toRow,
+    toCol,
+    validMoves,
+    null
+  );
 }
 
 async function handlePieceMove(
@@ -424,8 +602,9 @@ async function handlePieceMove(
   fromCol: number,
   toRow: number,
   toCol: number,
-  validMoves: MoveObj[]
-): Promise<[number[][], MoveObj | null]> {
+  validMoves: MoveObj[],
+  promotion: number | null
+): Promise<[number[][], MoveObj | null, boolean]> {
   const isValidMove = validMoves.some(
     (move) =>
       move.from.x === fromCol &&
@@ -435,7 +614,7 @@ async function handlePieceMove(
   );
 
   if (!isValidMove) {
-    return [board, null];
+    return [board, null, false];
   }
 
   const newBoard = board.map((row) => [...row]);
@@ -443,6 +622,15 @@ async function handlePieceMove(
   const startSquare = newBoard[fromRow][fromCol];
   const targetSquare = newBoard[toRow][toCol];
   const offset = toRow * 8 + toCol - (fromRow * 8 + fromCol);
+
+  if (
+    GetPiece(startSquare).type === Piece.PAWN &&
+    ((toRow === 0 && getPieceColor(startSquare) === Piece.BLACK) ||
+      (toRow === 7 && getPieceColor(startSquare) === Piece.WHITE)) &&
+    promotion === null
+  ) {
+    return [board, null, true];
+  }
 
   // En passant
   if (
@@ -467,9 +655,18 @@ async function handlePieceMove(
   newBoard[fromRow][fromCol] = Piece.NONE;
   newBoard[toRow][toCol] = startSquare;
 
+  if (promotion) {
+    newBoard[toRow][toCol] = promotion | getPieceColor(startSquare);
+  }
+
   return [
     newBoard,
-    { from: { x: fromCol, y: fromRow }, to: { x: toCol, y: toRow } },
+    {
+      from: { x: fromCol, y: fromRow },
+      to: { x: toCol, y: toRow },
+      promotion: null,
+    },
+    false,
   ];
 }
 

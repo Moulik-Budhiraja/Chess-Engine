@@ -1,4 +1,12 @@
-export default function Arrow({ from, to }: { from: number; to: number }) {
+export default function Arrow({
+  from,
+  to,
+  color = "#f8ba36",
+}: {
+  from: number;
+  to: number;
+  color?: string;
+}) {
   const fromRow = 7 - Math.floor(from / 8);
   const fromCol = from % 8;
   const toRow = 7 - Math.floor(to / 8);
@@ -30,7 +38,13 @@ export default function Arrow({ from, to }: { from: number; to: number }) {
             transformOrigin: "0 50%",
           }}
         >
-          <div className="bg-[#f8ba36] fill-[#f8ba36]  w-[calc(100%-3rem)] mr-4 h-full relative">
+          <div
+            className=" w-[calc(100%-3rem)] mr-4 h-full relative"
+            style={{
+              backgroundColor: color,
+              fill: color,
+            }}
+          >
             <svg
               className="absolute right-0 translate-x-full -translate-y-1/2 top-1/2 w-6"
               viewBox="0 0 80 100"
@@ -56,7 +70,13 @@ export default function Arrow({ from, to }: { from: number; to: number }) {
               transformOrigin: "0 50%",
             }}
           >
-            <div className="bg-[#f8ba36] fill-[#f8ba36]  w-[calc(100%)] ml-5 h-full relative"></div>
+            <div
+              className=" w-[calc(100%)] ml-5 h-full relative"
+              style={{
+                backgroundColor: color,
+                fill: color,
+              }}
+            ></div>
           </div>
           <div
             className="absolute h-[0.825rem] z-50 flex justify-center"
@@ -69,7 +89,13 @@ export default function Arrow({ from, to }: { from: number; to: number }) {
               transformOrigin: "0 50%",
             }}
           >
-            <div className="bg-[#f8ba36] fill-[#f8ba36] -translate-x-[0.425rem] w-[calc(100%)] mr-6 h-full relative">
+            <div
+              className="-translate-x-[0.425rem] w-[calc(100%)] mr-6 h-full relative"
+              style={{
+                backgroundColor: color,
+                fill: color,
+              }}
+            >
               <svg
                 className="absolute right-0 translate-x-full -translate-y-1/2 top-1/2 w-6"
                 viewBox="0 0 80 100"
@@ -96,7 +122,13 @@ export default function Arrow({ from, to }: { from: number; to: number }) {
               transformOrigin: "0 50%",
             }}
           >
-            <div className="bg-[#f8ba36] fill-[#f8ba36] w-[calc(100%)] ml-5 h-full relative"></div>
+            <div
+              className="w-[calc(100%)] ml-5 h-full relative"
+              style={{
+                backgroundColor: color,
+                fill: color,
+              }}
+            ></div>
           </div>
           <div
             className="absolute  h-[0.825rem] z-50  flex justify-center"
@@ -109,7 +141,13 @@ export default function Arrow({ from, to }: { from: number; to: number }) {
               transformOrigin: "0 50%",
             }}
           >
-            <div className="bg-[#f8ba36] fill-[#f8ba36] -translate-x-[0.425rem]  w-[calc(100%)] mr-6 h-full relative">
+            <div
+              className="-translate-x-[0.425rem]  w-[calc(100%)] mr-6 h-full relative"
+              style={{
+                backgroundColor: color,
+                fill: color,
+              }}
+            >
               <svg
                 className="absolute right-0 translate-x-full -translate-y-1/2 top-1/2 w-6"
                 viewBox="0 0 80 100"

@@ -13,3 +13,7 @@ export async function position(fen: string) {
 export async function getMoves() {
   return engine.getMoves();
 }
+
+export async function getBestMove(depth: number, engineTime: number) {
+  return engine.getBestMove(depth, engineTime);
+}
