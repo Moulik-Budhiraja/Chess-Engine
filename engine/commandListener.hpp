@@ -48,7 +48,7 @@ class EngineInterface {
             m_engine.newGame();
 
             for (size_t i = 1; i < args.size(); i++) {
-                m_engine.makePseudoLegalMove(Move(args[i]));
+                m_engine.makeMove(Move(args[i]));
             }
 
         } else if (args[0] == "fen") {
@@ -82,13 +82,17 @@ class EngineInterface {
 
     void perft(const vector<string>& args) {
         if (args.empty()) {
-            cout << "Perft command called no args, please pass depth" << endl;
+            cout << "perft command called no args, please pass depth" << endl;
             return;
         }
 
+        bool multiDepth = false;
+
+        if (args.size() > 1 && args[1] == "-d") multiDepth = true;
+
         int depth = stoi(args[0]);
 
-        cout << m_engine.perft(depth) << endl;
+        cout << m_engine.perft(depth, multiDepth) << endl;
     }
 
     void getfen() { cout << m_engine.getFen() << "\n"; }
@@ -102,6 +106,46 @@ class EngineInterface {
 
         cout << vecToString(uciMoves, true) << "\n";
     }
+
+    void getbestmove(const vector<string>& args) {
+        if (args.empty()) {
+            cout << "getbestmove called with no args. Useage: getbestmove <depth> [maxSearchTime]" << endl;
+            return;
+        }
+
+        int depth = stoi(args[0]);
+        int maxSearchTimeMs = 1000000;
+
+        // Second arg is max search time
+        if (args.size() == 2) {
+            maxSearchTimeMs = stoi(args[1]);
+        }
+
+        MoveEval bestMove = m_engine.getBestMove(depth, maxSearchTimeMs);
+
+        cout << bestMove.bestMove.toUci() << " " << bestMove.eval << endl;
+    }
+
+    void getbestpiece(const vector<string>& args) {
+        if (args.empty()) {
+            cout << "getbestpiece called with no args. Useage: getbestpiece <depth> [maxSearchTime]" << endl;
+            return;
+        }
+
+        int depth = stoi(args[0]);
+        int maxSearchTimeMs = 1000000;
+
+        // Second arg is max search time
+        if (args.size() == 2) {
+            maxSearchTimeMs = stoi(args[1]);
+        }
+
+        MoveEval bestMove = m_engine.getBestMove(depth, maxSearchTimeMs);
+
+        cout << Piece::toChar(m_engine.getPiece(bestMove.bestMove.getFrom())) << " " << bestMove.eval << endl;
+    }
+
+    void getgamewinner() { cout << m_engine.getGameWinner() << endl; }
 
     // Stub for the 'stop' command
     void stop() {
@@ -146,10 +190,16 @@ class EngineInterface {
                 go(args);
             } else if (command == "getfen") {
                 getfen();
-            } else if (command == "showboard") {
+            } else if (command == "d") {
                 showboard();
             } else if (command == "getmoves") {
                 getmoves();
+            } else if (command == "getbestmove") {
+                getbestmove(args);
+            } else if (command == "getbestpiece") {
+                getbestpiece(args);
+            } else if (command == "getgamewinner") {
+                getgamewinner();
             } else if (command == "stop") {
                 stop();
             } else if (command == "quit") {

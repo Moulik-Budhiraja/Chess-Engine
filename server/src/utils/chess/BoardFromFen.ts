@@ -77,7 +77,7 @@ export function boardFromFen(fen: string) {
 
 export function boardToFen(
   board: number[][],
-  turn: PieceColor,
+  turn: number,
   castling: number,
   enPassant: string,
   halfMove: number,

@@ -3,6 +3,7 @@ import {
   spawn,
   spawnSync,
 } from "child_process";
+import fs from "fs";
 
 interface Command {
   input: string;
@@ -15,12 +16,18 @@ export class Engine {
   private engine: ChildProcessWithoutNullStreams | null = null;
   private pendingCommands: Command[] = [];
 
+  static defaultOutputPath = "../engine/engine";
+
   constructor() {
-    this.loadEngine();
+    this.loadEngine(Engine.defaultOutputPath);
   }
 
-  loadEngine() {
-    this.engine = spawn("../engine/engine", []);
+  loadEngine(outputPath: string) {
+    if (this.engine) {
+      this.engine.kill();
+    }
+
+    this.engine = spawn(outputPath, []);
 
     this.engine.stdout.on("data", (data) => {
       const output: string = data.toString().trim();
@@ -73,10 +80,10 @@ export class Engine {
     });
   }
 
-  buildEngine() {
+  buildEngine(outputPath: string) {
     const buildCmd = spawnSync("g++", [
       "-o",
-      "../engine/engine",
+      outputPath,
       "../engine/main.cpp",
       "-O3",
     ]);
@@ -99,12 +106,12 @@ export class Engine {
     }
   }
 
-  reloadEngine() {
+  reloadEngine(outputPath: string = Engine.defaultOutputPath) {
     if (this.engine) {
       this.engine.kill();
     }
-    this.buildEngine();
-    this.loadEngine();
+    this.buildEngine(outputPath);
+    this.loadEngine(outputPath);
   }
 
   isResponseComplete(output: string, input: string): boolean {
@@ -159,5 +166,20 @@ export class Engine {
     }
   }
 
-  // Rest of your methods remain the same...
+  async getGameWinner(): Promise<string> {
+    try {
+      const output = await this.sendCommand("getgamewinner");
+      return output;
+    } catch (error) {
+      console.error("Error getting game winner:", error);
+      return "none";
+    }
+  }
+
+  listEngines(): string[] {
+    const engines = fs
+      .readdirSync("../engineVersions")
+      .filter((file) => file.endsWith(".exe"));
+    return engines;
+  }
 }

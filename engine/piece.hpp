@@ -18,6 +18,11 @@ constexpr int BLACK = 16;
 constexpr int TYPE_MASK = 0b111;
 constexpr int COLOR_MASK = 0b11000;
 
+constexpr int ALL_PIECES[12] = {Piece::PAWN | Piece::WHITE, Piece::KNIGHT | Piece::WHITE, Piece::BISHOP | Piece::WHITE,
+                                Piece::ROOK | Piece::WHITE, Piece::QUEEN | Piece::WHITE,  Piece::KING | Piece::WHITE,
+                                Piece::PAWN | Piece::BLACK, Piece::KNIGHT | Piece::BLACK, Piece::BISHOP | Piece::BLACK,
+                                Piece::ROOK | Piece::BLACK, Piece::QUEEN | Piece::BLACK,  Piece::KING | Piece::BLACK};
+
 inline bool isColor(int piece, int color) { return (piece & COLOR_MASK) == color; }
 inline bool isType(int piece, int type) { return (piece & TYPE_MASK) == type; }
 

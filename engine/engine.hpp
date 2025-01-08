@@ -5,23 +5,28 @@
 #include <chrono>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "board.hpp"
+#include "evaluation.hpp"
 #include "move.hpp"
 #include "piece.hpp"
 #include "square.hpp"
 
-#define MAX_SEARCH_DEPTH 5
+#define NEG_INF -1000000  // Close enough for all intents and purposes
+#define POS_INF 1000000
+
+// #define
 
 using namespace std;
+using namespace std::chrono_literals;
 
 struct MoveEval {
     int eval;
     Move bestMove;
-    int depth;
 
-    MoveEval() : eval(INT_MIN), bestMove(Move(0, 0)), depth(0) {}
-    MoveEval(int eval, int depth, Move bestMove) : eval(eval), bestMove(bestMove), depth(depth) {}
+    MoveEval() : eval(NEG_INF), bestMove(Move(0, 0)) {}
+    MoveEval(int eval, Move bestMove) : eval(eval), bestMove(bestMove) {}
 };
 
 struct MoveScore {
@@ -38,6 +43,9 @@ class Engine {
     ostream& m_outputStream;  // Reference to the output stream
     ostream& m_debugStream;
 
+    chrono::steady_clock::time_point m_searchEnd;
+    MoveEval m_lastBestMove;
+
     // Debug
     int m_positionsSearched = 0;
 
@@ -49,194 +57,221 @@ class Engine {
     void newGame() { newGame("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"); }
     void newGame(string fen) {
         m_board.setBoard(fen);
+        // m_debugStream << m_board.visualizeBoard() << endl;
+    }
 
-        m_debugStream << "Static Evaluation: " << evaluate(0) << endl;
+    void makeMove(Move move) {
+        m_board.makeMove(move);
+        // m_debugStream << m_board.visualizeBoard() << endl;
+    }
+
+    string showBoard() { return m_board.visualizeBoard(); }
+
+    MoveEval moveSearch(int searchDepth, int maxSearchTimeMs) {
+        m_debugStream << "Static Evaluation: " << evaluate() << endl;
         m_debugStream << "Is Check: " << m_board.isCheck() << endl;
         // m_debugStream << "Is Checkmate: " << m_board.isCheckmate() << endl;
         m_debugStream << "Total Moves: " << m_board.generateLegalMoves().size() << endl;
         // m_debugStream << "Legal Moves: " << arrToString(Move::getUciArr(m_board.generateLegalMoves())) << endl;
         m_debugStream << m_board.visualizeBoard() << endl;
 
-        // moveSearch();
+        chrono::steady_clock::time_point begin = chrono::steady_clock::now();
 
-        // for (int i = 1; i < 6; i++) {
-        //     chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-        //     int moves = moveTest(i);
-        //     chrono::steady_clock::time_point end = chrono::steady_clock::now();
-        //     m_debugStream << "Depth: " << i << " ply Result: " << moves
-        //                   << " positions Time: " << chrono::duration_cast<chrono::milliseconds>(end - begin).count()
-        //                   << "ms" << endl;
-        // }
+        m_searchEnd = begin + chrono::milliseconds(maxSearchTimeMs);
+        m_lastBestMove = MoveEval();
+        m_positionsSearched = 0;
 
-        // for (Move move : m_board.generateLegalMoves()) {
-        //     m_debugStream << move.toUci() << endl;
-        // }
-    }
+        int searchDepthReached = 0;
 
-    void makePseudoLegalMove(Move move) { m_board.makePseudoLegalMove(move); }
+        for (int i = 1; i <= searchDepth; i++) {
+            MoveEval searchResult = search(i, i);
+            if (isSearchCanceled()) break;
 
-    string showBoard() { return m_board.visualizeBoard(); }
-
-    int evaluate(int ply) {
-        int eval = 0;
-
-        // Compute material from White's perspective
-        for (int pos : Square::ALL_SQUARES) {
-            int piece = m_board.getPiece(pos);
-            eval += Piece::getMaterialValue(piece) * (Piece::isColor(piece, m_board.getTurn()) ? 1 : -1);
+            m_lastBestMove = searchResult;
+            searchDepthReached = i;
         }
 
-        try {
-            stackvector<Move, MAX_MOVES> legalMoves = m_board.generateLegalMoves();
-            if (m_board.isCheckmate(legalMoves)) {
-                return -100000 + ply;  // always negative if current player has no moves and is in check
-            }
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
+        m_lastBestMove.eval = m_lastBestMove.eval * (m_board.getTurn() == Piece::WHITE ? 1 : -1);
 
-            if (m_board.isStalemate(legalMoves)) {
-                return 0;
-            }
+        // m_debugStream << m_board.visualizeBoard() << endl;
+        m_debugStream << "\nSearch Time: " << chrono::duration_cast<chrono::milliseconds>(end - begin).count() << "ms"
+                      << endl;
+        m_debugStream << "Depth: " << searchDepthReached << endl;
+        m_debugStream << "Positions Searched: " << m_positionsSearched << endl;
+        m_debugStream << "Evaluation: " << m_lastBestMove.eval << endl;
+        m_debugStream << "Best Move: " << m_lastBestMove.bestMove.toUci() << endl;
+        // m_debugStream << "Best Line: " << arrToString(Move::getUciArr(principalVariation));
+        m_debugStream << "\nEval: " << m_lastBestMove.eval << endl << endl << endl;
 
-        } catch (out_of_range const&) {
-            m_debugStream << m_board.getFen() << endl;
-            throw out_of_range("HI");
+        m_debugStream.flush();
+
+        return m_lastBestMove;
+    }
+
+    inline bool isSearchCanceled() {
+        return m_positionsSearched % 957 == 0 && chrono::steady_clock::now() > m_searchEnd - 3ms;
+    }
+
+    MoveEval search(int depth, int searchDepth, int alpha = NEG_INF, int beta = POS_INF) {
+        int ply = searchDepth - depth + 1;
+        if (depth <= 0) {
+            return MoveEval(searchCaptures(alpha, beta), Move(0, 0));
+        }
+
+        if (isSearchCanceled()) {
+            return MoveEval(POS_INF, Move(0, 0));  // This move will never be picked
+        }
+
+        stackvector<Move, MAX_MOVES> moves = m_board.generateLegalMoves();
+
+        if (moves.empty()) {
+            if (m_board.isCheck()) return MoveEval(NEG_INF + ply, Move(0, 0));
+            return MoveEval(0, Move(0, 0));
+        }
+
+        orderMoves(moves, depth == searchDepth);
+
+        MoveEval bestSoFar = MoveEval(NEG_INF, Move(0, 0));
+        for (Move move : moves) {
+            m_board.makeMove(move);
+            MoveEval res = search(depth - 1, searchDepth, -beta, -alpha);
+            res.eval = -res.eval;  // Negamax flip
+            m_board.unmakeLastMove();
+
+            if (res.eval > bestSoFar.eval) {
+                bestSoFar.eval = res.eval;
+                bestSoFar.bestMove = move;
+            }
+            alpha = max(bestSoFar.eval, alpha);
+            if (beta <= alpha) break;
+        }
+
+        return bestSoFar;
+    }
+
+    int searchCaptures(int alpha, int beta) {
+        int eval = evaluate();
+        if (eval >= beta) {
+            return beta;
+        }
+        alpha = max(alpha, eval);
+
+        stackvector<Move, MAX_MOVES> moves = m_board.generateLegalMoves();
+        orderMoves(moves, false);
+
+        for (Move move : moves) {
+            if (!Piece::isColor(m_board.getPiece(move.getTo()), m_board.getNextTurn())) continue;
+
+            m_board.makeMove(move);
+            int eval = -searchCaptures(-beta, -alpha);
+            m_board.unmakeLastMove();
+
+            if (eval >= beta) return beta;
+            alpha = max(alpha, eval);
+        }
+
+        return alpha;
+    }
+
+    // Orders moves in place on the array
+    void orderMoves(stackvector<Move, MAX_MOVES>& moves, bool isRoot) {
+        stackvector<int, MAX_MOVES> moveScores;
+
+        for (Move move : moves) {
+            if (isRoot && move == m_lastBestMove.bestMove) {
+                moveScores.push_back(POS_INF);  // Guarantee that best move gets searched first
+            } else {
+                moveScores.push_back(staticMoveEval(move));
+            }
+        }
+
+        // Sort move array based on move scores (insertion sort)
+        for (size_t i = 1; i < moves.size(); i++) {
+            int scoreKey = moveScores[i];
+            Move moveKey = moves[i];
+
+            size_t j;
+            for (j = i; j > 0 && scoreKey > moveScores[j - 1]; j--) {
+                moveScores[j] = moveScores[j - 1];
+                moves[j] = moves[j - 1];
+            }
+            moveScores[j] = scoreKey;
+            moves[j] = moveKey;
+        }
+    }
+
+    int staticMoveEval(Move move) {
+        int score = 0;
+        int movedPiece = m_board.getPiece(move.getFrom());
+        int capturedPiece = m_board.getPiece(move.getTo());
+
+        // Capture opponents high value pieces with our low value pieces
+        if (capturedPiece != Piece::NONE)
+            score += 10 * Piece::getMaterialValue(capturedPiece) - Piece::getMaterialValue(movedPiece);
+
+        // Promotion is probably good
+        if (move.getFlags() != Flag::NONE) score += Piece::getMaterialValue(move.getPromotionPiece());
+
+        // Don't move piece to somewhere attacked by a pawn
+        if (m_board.isAttackedByPawn(move.getTo(), m_board.getNextTurn())) score -= Piece::getMaterialValue(movedPiece);
+
+        return score;
+    }
+
+    int evaluate() {
+        m_positionsSearched++;
+
+        int eval = 0;
+
+        int numPieces = 0;
+
+        // Compute material from White's perspective
+        for (int piece : Piece::ALL_PIECES) {
+            int num = BitBoard::getNumToggled(m_board.getBitboard(piece));
+            eval += Piece::getMaterialValue(piece) * num * (Piece::isColor(piece, m_board.getTurn()) ? 1 : -1);
+            numPieces += num;
+        }
+
+        for (int piece : Piece::ALL_PIECES) {
+            for (int pos : m_board.getPieceLocations(piece)) {
+                eval += PieceValues::getPieceSquareValue(piece, pos, numPieces) *
+                        (Piece::isColor(piece, m_board.getTurn()) ? 1 : -1);
+            }
         }
 
         return eval;
     }
 
-    Move moveSearch() {
-        m_debugStream << "Searching Position: " << endl;
-        m_debugStream << m_board.visualizeBoard() << endl;
-        // m_debugStream << BitBoard::visualize(m_board.getBitboard(Piece::QUEEN | Piece::WHITE)) << endl;
-
-        // m_debugStream << BitBoard::visualize(m_board.getBitboard(Piece::PAWN | Piece::BLACK)) << endl;
-
-        chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-
-        m_positionsSearched = 0;
-        array<Move, MAX_SEARCH_DEPTH> principalVariation{};
-        MoveEval searchResult = search(MAX_SEARCH_DEPTH, principalVariation);
-
-        chrono::steady_clock::time_point end = chrono::steady_clock::now();
-
-        m_debugStream << "\nSearch Time: " << chrono::duration_cast<chrono::milliseconds>(end - begin).count() << "ms"
-                      << endl;
-        m_debugStream << "Positions Searched: " << m_positionsSearched << endl << endl << endl;
-        // m_debugStream << "Best Line: " << arrToString(Move::getUciArr(principalVariation))
-        //               << "\nEval: " << searchResult.eval << endl;
-        m_debugStream.flush();
-
-        return searchResult.bestMove;
+    MoveEval getBestMove(int searchDepth, int maxSearchTimeMs = POS_INF) {
+        return moveSearch(searchDepth, maxSearchTimeMs);
+        // return MoveEval(0, Move(0, 1));
     }
 
-    MoveEval search(int depth, array<Move, MAX_SEARCH_DEPTH>& pv, int alpha = INT_MIN, int beta = INT_MAX) {
-        int ply = MAX_SEARCH_DEPTH - depth;
-
-        if (depth <= 0) {
-            m_positionsSearched++;
-            for (int i = ply; i < MAX_SEARCH_DEPTH; i++) {
-                pv[i] = Move(0, 0);
-            }
-            return {evaluate(ply), depth, Move(0, 0)};
-        }
-
-        stackvector<Move, MAX_MOVES> moves = orderMoves(m_board.generateLegalMoves());
-        if (moves.empty()) {
-            m_positionsSearched++;
-            for (int i = ply; i < MAX_SEARCH_DEPTH; i++) {
-                pv[i] = Move(0, 0);
-            }
-            return {evaluate(ply), depth, Move(0, 0)};
-        }
-
-        int bestEval = INT_MIN;
-        Move bestMove(0, 0);
-        int bestDepth = INT_MIN;
-
-        for (Move move : moves) {
-            array<Move, MAX_SEARCH_DEPTH> childPv{};
-            m_board.makePseudoLegalMove(move);
-            MoveEval res = search(depth - 1, childPv, -beta, -alpha);
-            // m_debugStream << "Eval: " << -res.eval << "     \t" << m_board.uciMoveStack() << endl;
-            m_board.unmakeLastMove();
-
-            int eval = -res.eval;  // Negamax flip
-
-            if (eval > bestEval) {
-                bestEval = eval;
-                bestMove = move;
-                bestDepth = depth;
-
-                alpha = bestEval;
-
-                // Write the current best move at the current ply
-                pv[ply] = move;
-
-                // Copy the child's PV after the current move
-                for (int i = ply + 1; i < MAX_SEARCH_DEPTH; i++) {
-                    pv[i] = childPv[i];
-                }
-
-                // If at root depth, print this newly found best line
-                if (depth == MAX_SEARCH_DEPTH) {
-                    m_debugStream << "Evaluating Line: " << arrToString(Move::getUciArr(pv)) << "\t\tEval: " << eval
-                                  << endl;
-                }
-            }
-
-            if (bestEval >= beta) break;
-        }
-
-        if (depth == MAX_SEARCH_DEPTH) {
-            m_debugStream << "Best Move: " << bestMove.toUci() << endl;
-        }
-
-        return {bestEval, bestDepth, bestMove};
-    }
-
-    stackvector<Move, MAX_MOVES> orderMoves(const stackvector<Move, MAX_MOVES>& moves) {
-        stackvector<MoveScore, MAX_MOVES> scoredMoves;
-
-        for (Move move : moves) {
-            int moveScore = 0;
-            // Captures are probably good
-            if (m_board.getPiece(move.getTo()) != Piece::NONE)
-                moveScore += Piece::getMaterialValue(m_board.getPiece(move.getTo())) -
-                             Piece::getMaterialValue(m_board.getPiece(move.getFrom()));
-
-            // Promotion is good
-            if (move.isPromotion()) moveScore += 500;
-
-            // Getting instantly taken by a pawn is probably not good
-            if (m_board.isAttackedByPawn(move.getTo(), m_board.getNextTurn()) &&
-                Piece::getMaterialValue(m_board.getPiece(move.getFrom())) > 100)
-                moveScore -= Piece::getMaterialValue(m_board.getPiece(move.getFrom()));
-
-            scoredMoves.push_back({moveScore, move});
-        }
-
-        sort(scoredMoves.begin(), scoredMoves.end(), [](const MoveScore& a, const MoveScore& b) {
-            return a.score > b.score;  // Descending order
-        });
-
-        stackvector<Move, MAX_MOVES> orderedMoves;
-
-        for (MoveScore scoredMove : scoredMoves) {
-            orderedMoves.push_back(scoredMove.move);
-        }
-
-        return orderedMoves;
-    }
+    int getPiece(int square) { return m_board.getPiece(square); }
 
     string getFen() const { return m_board.getFen(); }
 
-    string perft(int depth) {
+    string perft(int depth, bool multiDepth = false) {
         stringstream output;
 
         output << "\n";
 
-        int val = moveTest(depth, depth, output);
-        output << "\nMoves searched: " << val << endl;
+        if (!multiDepth) {
+            int val = moveTest(depth, depth, output);
+            output << "\nMoves searched: " << val << endl;
+
+        } else {
+            stringstream nullStream;
+            for (int i = 1; i < depth + 1; i++) {
+                chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+                int moves = moveTest(i, i, nullStream);
+                chrono::steady_clock::time_point end = chrono::steady_clock::now();
+                output << "Depth: " << i << " ply Result: " << moves
+                       << " positions Time: " << chrono::duration_cast<chrono::milliseconds>(end - begin).count()
+                       << "ms" << endl;
+            }
+        }
 
         return output.str();
     }
@@ -247,7 +282,7 @@ class Engine {
         int total = 0;
 
         for (Move move : m_board.generateLegalMoves()) {
-            m_board.makePseudoLegalMove(move);
+            m_board.makeMove(move);
             int val = moveTest(depth - 1, topDepth, output);
             total += val;
             if (depth == topDepth) {
@@ -265,5 +300,17 @@ class Engine {
 
         moves.insert(moves.end(), stackMoves.begin(), stackMoves.end());
         return moves;
+    }
+
+    // Game winner can be none, white, black, draw
+    string getGameWinner() {
+        stackvector<Move, MAX_MOVES> moves = m_board.generateLegalMoves();
+
+        if (moves.empty()) {
+            if (m_board.isCheck()) return m_board.getTurn() == Piece::WHITE ? "black" : "white";
+            return "draw";
+        }
+
+        return "none";
     }
 };

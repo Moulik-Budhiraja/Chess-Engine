@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "commandListener.hpp"
+#include "positionHash.hpp"
 #include "stackvector.hpp"
 
 using namespace std;

@@ -1,25 +1,37 @@
 "use server";
 
-import { getBestMove, position } from "../engineOperations";
+import {
+  getBestMove,
+  getBlackTestEngineBestMove,
+  getWhiteTestEngineBestMove,
+  position,
+  positionBlackTestEngine,
+  positionWhiteTestEngine,
+} from "../engineOperations";
 import { getMoveFromUci, MoveObj } from "./getValidMoves";
 
-type MoveEval = {
+export type MoveEval = {
   move: MoveObj;
   eval: number;
 };
 
-export async function solveBestMove(
+async function solveEngineBestMove(
   fen: string,
   depth: number,
-  engineTime: number
+  engineTime: number,
+  positionFunction: (fen: string) => Promise<void>,
+  getBestMoveFunction: (
+    depth: number,
+    engineTime: number
+  ) => Promise<string | undefined>
 ): Promise<MoveEval> {
-  await position(fen);
-  const bestMoveResult = await getBestMove(depth, engineTime);
+  await positionFunction(fen);
+  const bestMoveResult = await getBestMoveFunction(depth, engineTime);
 
   if (!bestMoveResult)
     return {
       eval: 0,
-      move: { from: { x: 0, y: 0 }, to: { x: 0, y: 0 } },
+      move: { from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, promotion: null },
     };
 
   const moveAndEval: string[] = bestMoveResult.split(" ");
@@ -30,4 +42,40 @@ export async function solveBestMove(
     move: move,
     eval: evaluation,
   };
+}
+
+export async function solveBestMove(
+  fen: string,
+  depth: number,
+  engineTime: number
+) {
+  return solveEngineBestMove(fen, depth, engineTime, position, getBestMove);
+}
+
+export async function solveWhiteTestEngineBestMove(
+  fen: string,
+  depth: number,
+  engineTime: number
+) {
+  return solveEngineBestMove(
+    fen,
+    depth,
+    engineTime,
+    positionWhiteTestEngine,
+    getWhiteTestEngineBestMove
+  );
+}
+
+export async function solveBlackTestEngineBestMove(
+  fen: string,
+  depth: number,
+  engineTime: number
+) {
+  return solveEngineBestMove(
+    fen,
+    depth,
+    engineTime,
+    positionBlackTestEngine,
+    getBlackTestEngineBestMove
+  );
 }

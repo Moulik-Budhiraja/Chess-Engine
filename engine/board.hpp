@@ -10,6 +10,7 @@
 #include "helpers.hpp"
 #include "move.hpp"
 #include "piece.hpp"
+#include "positionHash.hpp"
 #include "square.hpp"
 #include "stackvector.hpp"
 
@@ -41,17 +42,19 @@ struct MoveDelta {
 
 class Board {
    private:
-    int m_board[8][8] = {0};
+    int m_board[64] = {0};
     int m_turn;
     int m_castling;  // 0b1111, white kingside, white queenside, black kingside, black queenside
     int m_enPassant;
     int m_halfmove;
     int m_fullmove;
 
+    PositionHash m_positionHash;
+
     array<uint64_t, NUM_BITBOARDS> m_bitboards = {0};
 
     stack<MoveDelta> m_moveHistory;
-    stackvector<Move, MAX_MOVES> m_moveStack;
+    stackvector<Move, MAX_MOVES * 5> m_moveStack;
 
     ostream& m_debugStream;
 
@@ -59,8 +62,9 @@ class Board {
 
     void setSquare(int rank, int file, int piece) {
         setBitboard(Square::byRankFile(rank, file), piece);
+        updatePieceHash(Square::byRankFile(rank, file), piece);
 
-        m_board[rank][file] = piece;
+        m_board[rank * 8 + file] = piece;
     }
 
     void setBitboard(int square, int piece) {
@@ -75,6 +79,21 @@ class Board {
             // Set the bit for the new piece
             BitBoard::setBit(&m_bitboards[BitBoard::getBoardIndex(piece)], square);
         }
+    }
+
+    void updatePieceHash(int square, int piece) {
+        int originalPiece = getPiece(square);
+
+        // Do nothing if they're the same
+        if (originalPiece == piece) return;
+        // If the original is none and new is something, update new (add)
+        if (originalPiece == Piece::NONE) return m_positionHash.togglePiece(piece, square);
+        // If new is none, and original is something, update original (remove)
+        if (piece == Piece::NONE) return m_positionHash.togglePiece(originalPiece, square);
+
+        // Otherwise its a capture (toggle both)
+        m_positionHash.togglePiece(piece, square);
+        m_positionHash.togglePiece(originalPiece, square);
     }
 
    public:
@@ -93,6 +112,7 @@ class Board {
         m_enPassant = -1;  // -1 signifies no en passant available
         m_halfmove = 0;
         m_fullmove = 1;
+        m_positionHash.reset();
 
         // Split the FEN string into its components
         stringstream ss(fen);
@@ -119,6 +139,7 @@ class Board {
                 }
 
                 setSquare(rank, file, piece);
+                if (piece != Piece::NONE) m_positionHash.togglePiece(piece, Square::byRankFile(rank, file));
 
                 file++;
             }
@@ -129,6 +150,7 @@ class Board {
             m_turn = Piece::WHITE;
         } else if (activeColor == "b") {
             m_turn = Piece::BLACK;
+            m_positionHash.toggleTurn();
         } else {
             throw invalid_argument("Invalid FEN string: Active color must be 'w' or 'b'");
         }
@@ -155,6 +177,8 @@ class Board {
             }
         }
 
+        m_positionHash.toggleCastlingRights(m_castling);
+
         // Parse en passant square
         if (enPassantSquare != "-") {
             if (enPassantSquare.length() != 2 || enPassantSquare[0] < 'a' || enPassantSquare[0] > 'h' ||
@@ -166,6 +190,8 @@ class Board {
             int epFile = fileChar - 'a';
             int epRank = (rankChar - '1');  // 0-based index
             m_enPassant = Square::byRankFile(epRank, epFile);
+
+            m_positionHash.toggleEnPassant(epFile);
         }
 
         // Parse halfmove clock
@@ -264,6 +290,7 @@ class Board {
 
         if (includeFen) {
             visual << "\nBoard Fen: " << getFen() << endl;
+            visual << "HASH: " << m_positionHash.get() << endl;
         }
 
         return visual.str();
@@ -274,10 +301,10 @@ class Board {
     inline int getTurn() { return m_turn; }
     inline int getNextTurn() { return m_turn == Piece::WHITE ? Piece::BLACK : Piece::WHITE; }
 
-    inline int getPiece(int square) const { return m_board[Square::rank(square)][Square::file(square)]; }
-    inline int getPiece(int rank, int file) const { return m_board[rank][file]; }
+    inline int getPiece(int rank, int file) const { return getPiece(rank * 8 + file); }
+    inline int getPiece(int square) const { return m_board[square]; }
 
-    stackvector<Move, MAX_MOVES> generateLegalMoves(bool capturesOnly = false) {
+    stackvector<Move, MAX_MOVES> generateLegalMoves() {
         stackvector<Move, MAX_MOVES> moves;
         MoveLines pinLines = generateMoveLines(m_turn, MoveLine::PIN);
         MoveLines checkLines = generateMoveLines(m_turn, MoveLine::CHECK);
@@ -433,7 +460,7 @@ class Board {
             if (Square::isOnBoard(destSquare) && destSquare == m_enPassant) {
                 Move candidateMove = Move(startSquare, destSquare);
 
-                makePseudoLegalMove(candidateMove);
+                makeMove(candidateMove);
                 m_turn = getNextTurn();
                 bool causedCheck = isCheck();
                 m_turn = getNextTurn();
@@ -492,7 +519,7 @@ class Board {
                 // Make sure the move doesn't put the king in check
                 Move candidateMove = Move(startSquare, targetSquare);
 
-                makePseudoLegalMove(candidateMove);
+                makeMove(candidateMove);
                 m_turn = getNextTurn();
                 bool causedCheck = isCheck();
                 m_turn = getNextTurn();
@@ -527,7 +554,7 @@ class Board {
             if (!blocked && !passesCheck) {
                 Move candidateMove = Move(startSquare, startSquare - 2);
 
-                makePseudoLegalMove(candidateMove);
+                makeMove(candidateMove);
                 m_turn = getNextTurn();
                 bool causedCheck = isCheck();
                 m_turn = getNextTurn();
@@ -557,7 +584,7 @@ class Board {
             if (!blocked && !passesCheck) {
                 Move candidateMove = Move(startSquare, startSquare + 2);
 
-                makePseudoLegalMove(candidateMove);
+                makeMove(candidateMove);
                 m_turn = getNextTurn();
                 bool causedCheck = isCheck();
                 m_turn = getNextTurn();
@@ -671,8 +698,8 @@ class Board {
         uint64_t pawnAttacks = 0;
 
         if (attackerColor == Piece::WHITE) {
-            pawnAttacks |= (squareBoard & ~BitBoard::FILE_H) >> 9;  // left
-            pawnAttacks |= (squareBoard & ~BitBoard::FILE_A) >> 7;  // right
+            pawnAttacks |= (squareBoard & ~BitBoard::FILE_A) >> 9;  // left
+            pawnAttacks |= (squareBoard & ~BitBoard::FILE_H) >> 7;  // right
         }
         if (attackerColor == Piece::BLACK) {
             pawnAttacks |= (squareBoard & ~BitBoard::FILE_H) << 9;  // right
@@ -712,7 +739,7 @@ class Board {
 
     // Returns True if the current turn player is in check
     bool isCheck() {
-        for (const auto& kingSquare : getPieceLocations(m_turn | Piece::KING)) {
+        for (const int kingSquare : getPieceLocations(m_turn | Piece::KING)) {
             // Check if a pawn is giving check
             if (isAttackedByPawn(kingSquare, getNextTurn())) {
                 return true;
@@ -739,6 +766,8 @@ class Board {
 
                     if (Piece::isColor(destPiece, m_turn))
                         break;
+                    else if (Piece::isType(destPiece, Piece::KING) && i == 0)
+                        return true;
                     else if (Piece::isType(destPiece, Piece::QUEEN))
                         return true;
                     else if (Piece::isType(destPiece, Piece::ROOK) && dirIndex < 4)
@@ -774,7 +803,7 @@ class Board {
     }
 
     // Caller must make sure move is pseudo-legal
-    MoveDelta makePseudoLegalMove(const Move& move) {
+    MoveDelta makeMove(const Move move) {
         // Handle Basic Move Logic //
         int movedPiece = getPiece(move.getFrom());
         int capturedPiece = getPiece(move.getTo());
@@ -892,6 +921,26 @@ class Board {
 
         m_moveStack.push_back(move);
 
+        // Update Hash
+
+        m_positionHash.toggleTurn();
+        m_positionHash.toggleCastlingRights(delta.originalCastlingRights ^ m_castling);  // Toggle changed bits
+
+        // Do nothing if the same
+        if (delta.originalEnPassant == m_enPassant) {
+        }
+        // New Enpassant made, (turn on new)
+        else if (delta.originalEnPassant == 1)
+            m_positionHash.toggleEnPassant(Square::file(m_enPassant));
+        // Enpassant Cleared, (turn off old)
+        else if (m_enPassant == -1)
+            m_positionHash.toggleEnPassant(Square::file(delta.originalEnPassant));
+        // Enpassant changed, (turn off old, turn on new)
+        else {
+            m_positionHash.toggleEnPassant(Square::file(delta.originalEnPassant));
+            m_positionHash.toggleEnPassant(Square::file(m_enPassant));
+        }
+
         return delta;
     }
 
@@ -933,6 +982,25 @@ class Board {
         } else if (movedPiece == (Piece::BLACK | Piece::KING) && dx == -2) {
             setSquare(Square::A8, getPiece(Square::D8));
             setSquare(Square::D8, Piece::NONE);
+        }
+
+        // Update hash
+        m_positionHash.toggleTurn();
+        m_positionHash.toggleCastlingRights(m_castling ^ delta.originalCastlingRights);
+
+        // Do nothing if the same
+        if (delta.originalEnPassant == m_enPassant) {
+        }
+        // New Enpassant made, (turn on new)
+        else if (delta.originalEnPassant == 1)
+            m_positionHash.toggleEnPassant(Square::file(m_enPassant));
+        // Enpassant Cleared, (turn off old)
+        else if (m_enPassant == -1)
+            m_positionHash.toggleEnPassant(Square::file(delta.originalEnPassant));
+        // Enpassant changed, (turn off old, turn on new)
+        else {
+            m_positionHash.toggleEnPassant(Square::file(delta.originalEnPassant));
+            m_positionHash.toggleEnPassant(Square::file(m_enPassant));
         }
 
         // update member state

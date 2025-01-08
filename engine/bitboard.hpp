@@ -76,6 +76,8 @@ stackvector<int, NUM_SQUARES> getToggled(uint64_t board) {
     return toggled;
 }
 
+inline int getNumToggled(uint64_t board) { return __builtin_popcountll(board); }
+
 inline uint64_t getBit(uint64_t board, int square) { return (board >> square) & 1ULL; }
 
 inline void setBit(uint64_t* board, int square) { *board = *board | (1ULL << square); }
